@@ -64,6 +64,7 @@ int main(void)
     glTranslatef(-2.f, 0.f, 0.f);
 
     glBegin(GL_POINTS);
+    glTexCoord2f(1.f, 1.f);
     glColor3f(1.f, 0.f, 0.f); glVertex3f(-1.f, -1.f, 0.f);
     glColor3f(0.f, 0.f, 1.f); glVertex3f( 1.f, -1.f, 0.f);
     glColor3f(0.f, 1.f, 0.f); glVertex3f( 0.f,  1.f, 0.f);
@@ -72,10 +73,10 @@ int main(void)
     glPopMatrix();
     glTranslatef(2.f, 0.f, 0.f);
 
-    glBegin(GL_POINTS);
-    glColor3f(1.f, 0.f, 0.f); glVertex3f(-1.f, -1.f, 0.f);
-    glColor3f(0.f, 0.f, 1.f); glVertex3f( 1.f, -1.f, 0.f);
-    glColor3f(0.f, 1.f, 0.f); glVertex3f( 0.f,  1.f, 0.f);
+    glBegin(GL_TRIANGLES);
+    glTexCoord2f(0.f, 0.f); glColor3f(1.f, 0.f, 0.f); glVertex3f(-1.f, -1.f, 0.f);
+    glTexCoord2f(1.f, 0.f); glColor3f(0.f, 0.f, 1.f); glVertex3f( 1.f, -1.f, 0.f);
+    glTexCoord2f(.5f, 1.f); glColor3f(0.f, 1.f, 0.f); glVertex3f( 0.f,  1.f, 0.f);
     glEnd();
 
 

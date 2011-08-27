@@ -15,15 +15,18 @@
 #define SAS_MAX_PROGS   16
 #define SAS_MAX_SHADERS (4 * SAS_MAX_PROGS)
 
+#define SAS_MAX_UNIFORMS 32
+
 
 extern GLenum sas_error;
 
 extern void (*sas_vertex_transformation)(void);
+extern void (*sas_fragment_transformation)(void);
 
 
 // Definitions required to turn GLSL into C++
-extern char _binary_vertex_shader_include_hpp_start[];
-extern const void _binary_vertex_shader_include_hpp_size;
+extern char _binary_vertex_shader_include_hpp_start[], _binary_fragment_shader_include_hpp_start[];
+extern const void _binary_vertex_shader_include_hpp_size, _binary_fragment_shader_include_hpp_size;
 
 
 struct sas_shader;
@@ -40,11 +43,22 @@ struct sas_program
     void *dl;
 
     struct sas_shader_list *shaders;
+
+    void *uniforms[SAS_MAX_UNIFORMS];
+};
+
+struct uniform_list
+{
+    struct uniform_list *next;
+
+    void *address;
 };
 
 struct sas_shader
 {
     size_t refcount;
+
+    GLenum type;
 
     char *source;
 
@@ -87,7 +101,7 @@ GLuint glCreateProgram(void)
 // shader will never be unloaded, thus index 0 will always be occupied by it).
 GLuint glCreateShader(GLenum type)
 {
-    if (type != GL_VERTEX_SHADER)
+    if ((type != GL_VERTEX_SHADER) && (type != GL_FRAGMENT_SHADER))
     {
         sas_error = GL_INVALID_ENUM;
         return 0;
@@ -100,6 +114,8 @@ GLuint glCreateShader(GLenum type)
             shaders[i] = malloc(sizeof(*shaders[i]));
 
             shaders[i]->refcount = 1;
+
+            shaders[i]->type = type;
             shaders[i]->source = NULL;
             shaders[i]->compiled = NULL;
 
@@ -146,11 +162,22 @@ void glShaderSource(GLuint id, GLsizei count, const GLchar **string, const GLint
 
 
     // One more for NUL and some more for some include
-    shaders[id]->source = malloc(total_length + 1 + (uintptr_t)&_binary_vertex_shader_include_hpp_size);
+    if (shaders[id]->type == GL_VERTEX_SHADER)
+        shaders[id]->source = malloc(total_length + 1 + (uintptr_t)&_binary_vertex_shader_include_hpp_size);
+    else
+        shaders[id]->source = malloc(total_length + 1 + (uintptr_t)&_binary_fragment_shader_include_hpp_size);
 
     char *src = shaders[id]->source;
-    memcpy(src, _binary_vertex_shader_include_hpp_start, (uintptr_t)&_binary_vertex_shader_include_hpp_size);
-    src += (uintptr_t)&_binary_vertex_shader_include_hpp_size;
+    if (shaders[id]->type == GL_VERTEX_SHADER)
+    {
+        memcpy(src, _binary_vertex_shader_include_hpp_start, (uintptr_t)&_binary_vertex_shader_include_hpp_size);
+        src += (uintptr_t)&_binary_vertex_shader_include_hpp_size;
+    }
+    else
+    {
+        memcpy(src, _binary_fragment_shader_include_hpp_start, (uintptr_t)&_binary_fragment_shader_include_hpp_size);
+        src += (uintptr_t)&_binary_fragment_shader_include_hpp_size;
+    }
 
 
     for (int i = 0; i < count; i++)
@@ -195,7 +222,13 @@ void glCompileShader(GLuint id)
 
 
     system("sed -i 's/^\\s*#\\s*version.*$//g' /tmp/.soft-and-slow.cpp");
-    system("sed -i 's/void\\s\\+main(.*)/void sas_vertex_transform(void)/' /tmp/.soft-and-slow.cpp");
+
+    if (shaders[id]->type == GL_VERTEX_SHADER)
+        system("sed -i 's/void\\s\\+main(.*)/void sas_vertex_transform(void)/' /tmp/.soft-and-slow.cpp");
+    else
+        system("sed -i 's/void\\s\\+main(.*)/void sas_fragment_transform(void)/' /tmp/.soft-and-slow.cpp");
+
+    system("sed -i 's/uniform\\s\\+\\(\\w\\+\\)\\s\\+\\(\\w\\+\\)/#define \\2 sas_uniform_\\2\\n\\1 \\2/g' /tmp/.soft-and-slow.cpp");
 
     if (system("g++ -Wall -Wextra -pedantic -std=c++0x -O3 -fPIC -c /tmp/.soft-and-slow.cpp -o /tmp/.soft-and-slow.o"))
     {
@@ -250,6 +283,10 @@ void glLinkProgram(GLuint id)
 
     if (programs[id]->dl != NULL)
         dlclose(programs[id]->dl);
+
+
+    for (int i = 0; i < SAS_MAX_UNIFORMS; i++)
+        programs[id]->uniforms[i] = NULL;
 
 
     for (struct sas_shader_list *sl = programs[id]->shaders; sl != NULL; sl = sl->next)
@@ -308,5 +345,57 @@ void glDeleteShader(GLuint id)
 
 void glUseProgram(GLuint id)
 {
-    sas_vertex_transformation = (void (*)(void))(uintptr_t)dlsym(programs[id]->dl, "sas_vertex_transform");
+    sas_vertex_transformation   = (void (*)(void))(uintptr_t)dlsym(programs[id]->dl, "sas_vertex_transform");
+    sas_fragment_transformation = (void (*)(void))(uintptr_t)dlsym(programs[id]->dl, "sas_fragment_transform");
+}
+
+
+GLint glGetUniformLocation(GLuint id, const GLchar *name)
+{
+    if (programs[id] == NULL)
+    {
+        sas_error = GL_INVALID_VALUE;
+        return -1;
+    }
+
+
+    char tname[strlen(name) + 32];
+    sprintf(tname, "sas_uniform_%s", name);
+
+    void *ptr = dlsym(programs[id]->dl, tname);
+
+
+    for (int i = 0; i < SAS_MAX_UNIFORMS; i++)
+        if (programs[id]->uniforms[i] == ptr)
+            return id * SAS_MAX_UNIFORMS + i;
+
+    for (int i = 0; i < SAS_MAX_UNIFORMS; i++)
+    {
+        // FIXME: Atomically
+        if (programs[id]->uniforms[i] == NULL)
+        {
+            programs[id]->uniforms[i] = ptr;
+            return id * SAS_MAX_UNIFORMS + i;
+        }
+    }
+
+
+    sas_error = GL_OUT_OF_MEMORY;
+
+    return -1;
+}
+
+void glUniform1i(GLint location, GLint v0)
+{
+    GLuint prog = location / SAS_MAX_UNIFORMS;
+    location %= SAS_MAX_UNIFORMS;
+
+    if ((programs[prog] == NULL) || (programs[prog]->uniforms[location] == NULL))
+    {
+        sas_error = GL_INVALID_VALUE;
+        return;
+    }
+
+
+    *(GLint *)programs[prog]->uniforms[location] = v0;
 }

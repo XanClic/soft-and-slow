@@ -14,4 +14,7 @@ void glCompileShader(GLuint id);
 void glAttachShader(GLuint program, GLuint shader);
 void glDeleteShader(GLuint id);
 
+GLint glGetUniformLocation(GLuint program, const GLchar *name);
+void glUniform1i(GLint location, GLint v0);
+
 #endif
