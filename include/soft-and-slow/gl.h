@@ -40,4 +40,6 @@ void glColor3f(GLfloat r, GLfloat g, GLfloat b);
 void glTexCoord2f(GLfloat s, GLfloat t);
 void glVertex3f(GLfloat x, GLfloat y, GLfloat z);
 
+void glActiveTexture(GLenum unit);
+
 #endif

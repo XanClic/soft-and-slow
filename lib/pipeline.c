@@ -29,7 +29,7 @@ extern sas_color_t sas_current_color;
 extern float sas_current_vertex[4], sas_current_position[4];
 
 
-bool sas_transform_vertex_to_screen(void)
+void sas_transform_vertex_to_screen(void)
 {
     sas_vertex_transformation();
 
@@ -37,17 +37,6 @@ bool sas_transform_vertex_to_screen(void)
     sas_current_position[0] *= sas_current_position[3];
     sas_current_position[1] *= sas_current_position[3];
     sas_current_position[2] *= sas_current_position[3];
-
-
-    // Frustum Culling
-    if ((sas_current_position[0] < -1.) || (sas_current_position[0] > 1.) ||
-        (sas_current_position[1] < -1.) || (sas_current_position[1] > 1.) ||
-        (sas_current_position[2] < -1.) || (sas_current_position[2] > 1.))
-    {
-        return false;
-    }
-
-    return true;
 }
 
 bool sas_depth_test(sas_context_t ctx, unsigned x, unsigned y, float d)
@@ -78,6 +67,15 @@ void sas_blend_pixel(sas_context_t ctx, unsigned x, unsigned y, sas_color_t colo
 
 void sas_transform_fragment(void)
 {
+    // Frustum Culling
+    if ((sas_current_position[0] < -1.) || (sas_current_position[0] > 1.) ||
+        (sas_current_position[1] < -1.) || (sas_current_position[1] > 1.) ||
+        (sas_current_position[2] < -1.) || (sas_current_position[2] > 1.))
+    {
+        return;
+    }
+
+
     sas_current_position[0] = ((sas_current_position[0] + 1.) / 2.) * current_sas_context->width;
     sas_current_position[1] = ((sas_current_position[1] + 1.) / 2.) * current_sas_context->height;
 
