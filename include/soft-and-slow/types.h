@@ -3,8 +3,10 @@
 
 #include <stdint.h>
 
+#include "compiler.h"
 
-#define SAS_COLOR_TYPE   sas_color_t
+
+#define SAS_COLOR_TYPE   sas_icolor_t
 #define SAS_DEPTH_TYPE   float
 #define SAS_STENCIL_TYPE uint8_t
 
@@ -25,9 +27,10 @@ typedef float         GLclampf;
 typedef double        GLclampd;
 
 
-typedef union sas_color sas_color_t;
+// Integer color
+typedef union sas_icolor sas_icolor_t;
 
-union sas_color
+union sas_icolor
 {
     // Anonymous struct in order to access the red, green, blue and alpha
     // channel seperately
@@ -41,14 +44,11 @@ union sas_color
 };
 
 
-// Defines window coordinates
-typedef struct sas_wnd_coord sas_wnd_coord_t;
+typedef struct sas_color sas_color_t;
 
-struct sas_wnd_coord
+struct sas_color
 {
-    unsigned x, y;
-
-    SAS_DEPTH_TYPE d;
+    float r, g, b, a;
 };
 
 #endif
