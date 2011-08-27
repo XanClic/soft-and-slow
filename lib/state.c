@@ -62,3 +62,11 @@ float sas_current_vertex[4], sas_current_position[4];
 float sas_triangle_positions[3][4], sas_triangle_texcoords[3][4];
 sas_color_t sas_triangle_colors[3];
 int sas_triangle_index;
+
+float sas_quad_positions[4][4], sas_quad_texcoords[4][4];
+sas_color_t sas_quad_colors[4];
+int sas_quad_index;
+
+
+int sas_current_texture_unit;
+bool sas_2d_textures_enabled;

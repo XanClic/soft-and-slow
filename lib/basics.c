@@ -20,7 +20,7 @@ extern GLenum sas_error;
 
 extern SAS_MATRIX_TYPE sas_modelview[16], sas_projection[16];
 
-extern bool sas_do_depth_test, sas_do_alpha_test;
+extern bool sas_do_depth_test, sas_do_alpha_test, sas_2d_textures_enabled;
 extern bool (*sas_depth_func)(float new, float current);
 extern bool (*sas_alpha_func)(float new, float ref);
 
@@ -95,6 +95,9 @@ void glEnable(GLenum cap)
         case GL_DEPTH_TEST:
             sas_do_depth_test = true;
             break;
+        case GL_TEXTURE_2D:
+            sas_2d_textures_enabled = true;
+            break;
         default:
             sas_error = GL_INVALID_ENUM;
     }
@@ -110,6 +113,9 @@ void glDisable(GLenum cap)
         case GL_DEPTH_TEST:
             sas_do_depth_test = false;
             break;
+        case GL_TEXTURE_2D:
+            sas_2d_textures_enabled = false;
+            break;
         default:
             sas_error = GL_INVALID_ENUM;
     }
@@ -123,6 +129,8 @@ GLboolean glIsEnabled(GLenum cap)
             return sas_do_alpha_test;
         case GL_DEPTH_TEST:
             return sas_do_depth_test;
+        case GL_TEXTURE_2D:
+            return sas_2d_textures_enabled;
         default:
             sas_error = GL_INVALID_ENUM;
     }

@@ -6,6 +6,8 @@
 
 #define GL_POINTS    0
 #define GL_TRIANGLES 4
+#define GL_QUADS     7
+
 
 #define GL_NO_ERROR          0x0000
 #define GL_INVALID_ENUM      0x0500
@@ -83,5 +85,18 @@
 
 #define GL_FRAGMENT_SHADER 0x8B30
 #define GL_VERTEX_SHADER   0x8B31
+
+#define GL_TEXTURE0 0x84C0
+#define GL_TEXTURE1 0x84C1
+#define GL_TEXTURE2 0x84C2
+#define GL_TEXTURE3 0x84C3
+#define GL_TEXTURE4 0x84C4
+#define GL_TEXTURE5 0x84C5
+#define GL_TEXTURE6 0x84C6
+#define GL_TEXTURE7 0x84C7
+
+#define SAS_TEX_UNITS 8
+
+#define GL_TEXTURE_2D 0x0DE1
 
 #endif

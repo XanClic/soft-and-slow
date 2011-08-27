@@ -75,10 +75,11 @@ extern "C" vec4 gl_FragColor, gl_FragCoord;
 
 extern "C" void sas_fragment_transform(void);
 
+// I do love casts without involving the compiler (this function actually
+// returns sas_color_t).
+extern "C" vec4 sas_texture_get(int unit, float u, float v);
+
 static vec4 texture2D(sampler2D texture, vec2 coords)
 {
-    (void)texture;
-    (void)coords;
-
-    return vec4(1.f, 1.f, 1.f, 1.f);
+    return sas_texture_get(texture, coords.s, coords.t);
 }
