@@ -1,22 +1,14 @@
 #include <assert.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include <soft-and-slow/constants.h>
 #include <soft-and-slow/gl.h>
 #include <soft-and-slow/glext.h>
 
 
-extern GLuint sas_fixed_pipeline;
-
-char *fixed_vertex_source = "#version 110\n"
-                            "#include <stdio.h>\n"
-                            "\n"
-                            "void main()\n"
-                            "{\n"
-                            "    gl_Position = ftransform();\n"
-                            "    gl_TexCoord[0] = gl_MultiTexCoord0;\n"
-                            "}";
-
+extern char _binary_fixed_vertex_transformation_glsl_start[];
+extern const void _binary_fixed_vertex_transformation_glsl_size;
 
 void sas_init(void)
 {
@@ -25,13 +17,15 @@ void sas_init(void)
     glDepthFunc(GL_LESS);
 
 
-    sas_fixed_pipeline = glCreateProgram();
+    GLuint sas_fixed_pipeline = glCreateProgram();
     assert(!sas_fixed_pipeline);
 
 
     GLuint fixed_vertex = glCreateShader(GL_VERTEX_SHADER);
 
-    glShaderSource(fixed_vertex, 1, (const GLchar **)&fixed_vertex_source, NULL);
+    char *src = _binary_fixed_vertex_transformation_glsl_start;
+    int sz = (uintptr_t)&_binary_fixed_vertex_transformation_glsl_size;
+    glShaderSource(fixed_vertex, 1, (const GLchar **)&src, &sz);
     glCompileShader(fixed_vertex);
 
     glAttachShader(sas_fixed_pipeline, fixed_vertex);

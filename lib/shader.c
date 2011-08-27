@@ -21,6 +21,11 @@ extern GLenum sas_error;
 extern void (*sas_vertex_transformation)(void);
 
 
+// Definitions required to turn GLSL into C++
+extern char _binary_vertex_shader_include_hpp_start[];
+extern const void _binary_vertex_shader_include_hpp_size;
+
+
 struct sas_shader;
 
 struct sas_shader_list
@@ -109,70 +114,6 @@ GLuint glCreateShader(GLenum type)
 }
 
 
-// Definitions required to turn GLSL into C++
-static const char *vtx_shd_def =
-   "extern \"C\" void sas_multiply_matrix(float *d, float *s);\n"
-   "extern \"C\" void sas_matrix_dot_vector(float *matrix, float *vector);\n"
-   "\n"
-   "class vec4\n"
-   "{\n"
-   "    public:\n"
-   "        float operator[](int i) { return v[i]; }\n"
-   "\n"
-   "        union\n"
-   "        {\n"
-   "            float v[4];\n"
-   "            struct { float x, y, z, w; } __attribute__((packed));\n"
-   "            struct { float r, g, b, a; } __attribute__((packed));\n"
-   "            struct { float s, t, p, q; } __attribute__((packed));\n"
-   "        };\n"
-   "};\n"
-   "\n"
-   "class mat4\n"
-   "{\n"
-   "    public:\n"
-   "        float operator[](int i) { return v[i]; }\n"
-   "        mat4 operator*(mat4 &m)\n"
-   "        {\n"
-   "            mat4 ret(*this);\n"
-   "            sas_multiply_matrix(ret.v, m.v);\n"
-   "            return ret;\n"
-   "        }\n"
-   "        vec4 operator*(vec4 &vec)\n"
-   "        {\n"
-   "            vec4 ret(vec);\n"
-   "            sas_matrix_dot_vector(v, ret.v);\n"
-   "            return ret;\n"
-   "        }\n"
-   "\n"
-   "        float v[16];\n"
-   "};\n"
-   "\n"
-   "#define gl_ModelViewMatrix sas_modelview\n"
-   "#define gl_ProjectionMatrix sas_projection\n"
-   "#define gl_ModelViewProjectionMatrix sas_modelviewprojection\n"
-   "#define gl_Color sas_current_color\n"
-   "#define gl_Vertex sas_current_vertex\n"
-   "#define gl_Position sas_current_position\n"
-   "#define gl_TexCoord sas_current_texcoord\n"
-   "#define gl_MultiTexCoord0 sas_multi_texcoord0\n"
-   "\n"
-   "extern \"C\" vec4 gl_Vertex, gl_Position;\n"
-   "extern \"C\" vec4 gl_TexCoord[8], gl_MultiTexCoord0;\n"
-   "\n"
-   "extern \"C\" mat4 gl_ModelViewProjectionMatrix;\n"
-   "extern \"C\" mat4 gl_ModelViewMatrix, gl_ProjectionMatrix;\n"
-   "\n"
-   "extern \"C\" vec4 gl_Color;\n"
-   "\n"
-   "static vec4 ftransform(void)\n"
-   "{\n"
-   "    return gl_ModelViewProjectionMatrix * gl_Vertex;\n"
-   "}\n"
-   "\n"
-   "extern \"C\" void sas_vertex_transform(void);\n";
-
-
 void glShaderSource(GLuint id, GLsizei count, const GLchar **string, const GLint *length)
 {
     if (shaders[id] == NULL)
@@ -205,11 +146,11 @@ void glShaderSource(GLuint id, GLsizei count, const GLchar **string, const GLint
 
 
     // One more for NUL and some more for some include
-    shaders[id]->source = malloc(total_length + 1 + strlen(vtx_shd_def));
+    shaders[id]->source = malloc(total_length + 1 + (uintptr_t)&_binary_vertex_shader_include_hpp_size);
 
     char *src = shaders[id]->source;
-    strcpy(src, vtx_shd_def);
-    src += strlen(vtx_shd_def);
+    memcpy(src, _binary_vertex_shader_include_hpp_start, (uintptr_t)&_binary_vertex_shader_include_hpp_size);
+    src += (uintptr_t)&_binary_vertex_shader_include_hpp_size;
 
 
     for (int i = 0; i < count; i++)

@@ -52,8 +52,6 @@ bool (*sas_depth_func)(float new, float current);
 bool (*sas_alpha_func)(float new, float ref);
 
 
-GLuint sas_fixed_pipeline;
-
 void (*sas_vertex_transformation)(void);
 
 
