@@ -4,10 +4,21 @@
 #define GL_FALSE 0
 #define GL_TRUE  1
 
+#define GL_BYTE           0x1400
+#define GL_UNSIGNED_BYTE  0x1401
+#define GL_SHORT          0x1402
+#define GL_UNSIGNED_SHORT 0x1403
+#define GL_INT            0x1404
+#define GL_UNSIGNED_INT   0x1405
+#define GL_FLOAT          0x1406
+#define GL_2_BYTES        0x1407
+#define GL_3_BYTES        0x1408
+#define GL_4_BYTES        0x1409
+#define GL_DOUBLE         0x140A
+
 #define GL_POINTS    0
 #define GL_TRIANGLES 4
 #define GL_QUADS     7
-
 
 #define GL_NO_ERROR          0x0000
 #define GL_INVALID_ENUM      0x0500
@@ -95,8 +106,31 @@
 #define GL_TEXTURE6 0x84C6
 #define GL_TEXTURE7 0x84C7
 
-#define SAS_TEX_UNITS 8
-
 #define GL_TEXTURE_2D 0x0DE1
+
+#define GL_RED             0x1903
+#define GL_GREEN           0x1904
+#define GL_BLUE            0x1905
+#define GL_ALPHA           0x1906
+#define GL_RGB             0x1907
+#define GL_RGBA            0x1908
+#define GL_LUMINANCE       0x1909
+#define GL_LUMINANCE_ALPHA 0x190A
+#define GL_INTENSITY       0x8049
+#define GL_BGR             0x80E0
+#define GL_BGRA            0x80E1
+
+#define GL_CULL_FACE      0x0B44
+#define GL_CW             0x0900
+#define GL_CCW            0x0901
+#define GL_FRONT          0x0404
+#define GL_BACK           0x0405
+#define GL_FRONT_AND_BACK 0x0408
+
+#define GL_SHADER_TYPE     0x8B4F
+#define GL_COMPILE_STATUS  0x8B81
+#define GL_LINK_STATUS     0x8B82
+#define GL_INFO_LOG_LENGTH 0x8B84
+
 
 #endif

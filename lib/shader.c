@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <dlfcn.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -8,14 +9,9 @@
 
 #include <soft-and-slow/constants.h>
 #include <soft-and-slow/glext.h>
+#include <soft-and-slow/limits.h>
+#include <soft-and-slow/shader.h>
 #include <soft-and-slow/types.h>
-
-
-// Maybe appropriate. Anyway, easy to adjust.
-#define SAS_MAX_PROGS   16
-#define SAS_MAX_SHADERS (4 * SAS_MAX_PROGS)
-
-#define SAS_MAX_UNIFORMS 32
 
 
 extern GLenum sas_error;
@@ -26,7 +22,9 @@ extern void (*sas_fragment_transformation)(void);
 
 // Definitions required to turn GLSL into C++
 extern char _binary_vertex_shader_include_hpp_start[], _binary_fragment_shader_include_hpp_start[];
+extern char _binary_general_shader_include_hpp_start[], _binary_general_shader_common_cpp_start[];
 extern const void _binary_vertex_shader_include_hpp_size, _binary_fragment_shader_include_hpp_size;
+extern const void _binary_general_shader_include_hpp_size, _binary_general_shader_common_cpp_size;
 
 
 struct sas_shader;
@@ -38,6 +36,46 @@ struct sas_shader_list
     struct sas_shader *shader;
 };
 
+struct shader_varyings
+{
+    struct shader_varyings *next;
+
+    char *identifier;
+
+    enum sas_varying_types type;
+    size_t size;
+};
+
+struct program_varyings
+{
+    struct program_varyings *next;
+
+    union
+    {
+        // C++ bool == uint8_t, isn't it? (FIXME if necessary)
+        uint8_t *val_bool;
+        int *val_int;
+        float *val_float;
+
+        void *address;
+    };
+
+    // TODO: structures
+    enum sas_varying_types type;
+    // Number of fields (if array, else 1)
+    size_t size;
+
+
+    union
+    {
+        uint8_t *saved_bool;
+        int *saved_int;
+        float *saved_float;
+
+        void *saved_values;
+    };
+};
+
 struct sas_program
 {
     void *dl;
@@ -45,6 +83,8 @@ struct sas_program
     struct sas_shader_list *shaders;
 
     void *uniforms[SAS_MAX_UNIFORMS];
+
+    struct program_varyings *varyings;
 };
 
 struct uniform_list
@@ -64,10 +104,20 @@ struct sas_shader
 
     size_t compiled_len;
     void *compiled;
+
+    size_t log_len;
+    char *log;
+
+    struct shader_varyings *varyings;
 };
 
 static struct sas_program *programs[SAS_MAX_PROGS];
 static struct sas_shader *shaders[SAS_MAX_SHADERS];
+
+static struct sas_program *current_program = NULL;
+
+static const size_t varying_type_sizes[] = { sizeof(uint8_t), sizeof(int), sizeof(float) };
+static int varying_index = 0;
 
 
 // Of course, this function may return 0 though succeeding. But since the init
@@ -84,6 +134,7 @@ GLuint glCreateProgram(void)
 
             programs[i]->shaders = NULL;
             programs[i]->dl = NULL;
+            programs[i]->varyings = NULL;
 
             return i;
         }
@@ -117,7 +168,11 @@ GLuint glCreateShader(GLenum type)
 
             shaders[i]->type = type;
             shaders[i]->source = NULL;
+            shaders[i]->compiled_len = 0;
             shaders[i]->compiled = NULL;
+            shaders[i]->log_len = 0;
+            shaders[i]->log = NULL;
+            shaders[i]->varyings = NULL;
 
             return i;
         }
@@ -161,24 +216,10 @@ void glShaderSource(GLuint id, GLsizei count, const GLchar **string, const GLint
     }
 
 
-    // One more for NUL and some more for some include
-    if (shaders[id]->type == GL_VERTEX_SHADER)
-        shaders[id]->source = malloc(total_length + 1 + (uintptr_t)&_binary_vertex_shader_include_hpp_size);
-    else
-        shaders[id]->source = malloc(total_length + 1 + (uintptr_t)&_binary_fragment_shader_include_hpp_size);
+    // One more for NUL
+    shaders[id]->source = malloc(total_length + 1);
 
     char *src = shaders[id]->source;
-    if (shaders[id]->type == GL_VERTEX_SHADER)
-    {
-        memcpy(src, _binary_vertex_shader_include_hpp_start, (uintptr_t)&_binary_vertex_shader_include_hpp_size);
-        src += (uintptr_t)&_binary_vertex_shader_include_hpp_size;
-    }
-    else
-    {
-        memcpy(src, _binary_fragment_shader_include_hpp_start, (uintptr_t)&_binary_fragment_shader_include_hpp_size);
-        src += (uintptr_t)&_binary_fragment_shader_include_hpp_size;
-    }
-
 
     for (int i = 0; i < count; i++)
     {
@@ -213,11 +254,38 @@ void glCompileShader(GLuint id)
 
     shaders[id]->compiled_len = 0;
     free(shaders[id]->compiled);
+    shaders[id]->compiled = NULL;
+
+    shaders[id]->log_len = 0;
+    free(shaders[id]->log);
+    shaders[id]->log = NULL;
+
+    struct shader_varyings *v = shaders[id]->varyings;
+    while (v != NULL)
+    {
+        struct shader_varyings *vn = v->next;
+        free(v);
+        v = vn;
+    }
+    shaders[id]->varyings = NULL;
 
 
     // FIXME: Not that good when multiple threads are doing this
     FILE *tfp = fopen("/tmp/.soft-and-slow.cpp", "w");
+    fputs("#include \".soft-and-slow-general.hpp\"\n", tfp);
+    fputs("#include \".soft-and-slow-specific.hpp\"\n\n", tfp);
     fputs(shaders[id]->source, tfp);
+    fclose(tfp);
+
+    tfp = fopen("/tmp/.soft-and-slow-general.hpp", "w");
+    fwrite(&_binary_general_shader_include_hpp_start, 1, (size_t)&_binary_general_shader_include_hpp_size, tfp);
+    fclose(tfp);
+
+    tfp = fopen("/tmp/.soft-and-slow-specific.hpp", "w");
+    if (shaders[id]->type == GL_VERTEX_SHADER)
+        fwrite(&_binary_vertex_shader_include_hpp_start, 1, (size_t)&_binary_vertex_shader_include_hpp_size, tfp);
+    else
+        fwrite(&_binary_fragment_shader_include_hpp_start, 1, (size_t)&_binary_fragment_shader_include_hpp_size, tfp);
     fclose(tfp);
 
 
@@ -230,13 +298,103 @@ void glCompileShader(GLuint id)
 
     system("sed -i 's/uniform\\s\\+\\(\\w\\+\\)\\s\\+\\(\\w\\+\\)/#define \\2 sas_uniform_\\2\\n\\1 \\2/g' /tmp/.soft-and-slow.cpp");
 
-    if (system("g++ -Wall -Wextra -pedantic -std=c++0x -O3 -fPIC -c /tmp/.soft-and-slow.cpp -o /tmp/.soft-and-slow.o"))
+    if (shaders[id]->type == GL_FRAGMENT_SHADER)
+        system("sed -i 's/varying\\s\\+\\(\\w\\+\\)\\s\\+\\(\\w\\+\\)/#define \\2 sas_varying_\\2\\nextern \\1 \\2/g' /tmp/.soft-and-slow.cpp");
+    else
     {
-        fprintf(stderr, "Compiling failed, leaving patched shader in /tmp/.soft-and-slow.cpp.\n");
+        system("grep -e varying /tmp/.soft-and-slow.cpp | sed -e 's/varying\\s\\+\\(\\w\\+\\)\\s\\+\\(\\w\\+\\);/\\1\\n\\2/g' > /tmp/.soft-and-slow.varyings");
+
+        system("sed -i 's/varying\\s\\+\\(\\w\\+\\)\\s\\+\\(\\w\\+\\)/#define \\2 sas_varying_\\2\\n\\1 \\2/g' /tmp/.soft-and-slow.cpp");
+
+        tfp = fopen("/tmp/.soft-and-slow.varyings", "r");
+        char line[256];
+
+        struct shader_varyings **lvp = &shaders[id]->varyings;
+        while (!feof(tfp) && !ferror(tfp))
+        {
+            if (fgets(line, 256, tfp) == NULL)
+                break;
+
+            if (line[strlen(line) - 1] == '\n')
+                line[strlen(line) - 1] = 0;
+
+            struct shader_varyings *v = calloc(1, sizeof(*v));
+
+            if (!strcmp(line, "float")) { v->type = SAS_FLOAT; v->size = 1; }
+            else if (!strcmp(line, "int")) { v->type = SAS_INT; v->size = 1; }
+            else if (!strcmp(line, "bool")) { v->type = SAS_BOOL; v->size = 1; }
+            else if (!strcmp(line, "vec2")) { v->type = SAS_FLOAT; v->size = 2; }
+            else if (!strcmp(line, "vec3")) { v->type = SAS_FLOAT; v->size = 3; }
+            else if (!strcmp(line, "vec4")) { v->type = SAS_FLOAT; v->size = 4; }
+            else if (!strcmp(line, "vec2i")) { v->type = SAS_INT; v->size = 2; }
+            else if (!strcmp(line, "vec3i")) { v->type = SAS_INT; v->size = 3; }
+            else if (!strcmp(line, "vec4i")) { v->type = SAS_INT; v->size = 4; }
+            else if (!strcmp(line, "vec2b")) { v->type = SAS_BOOL; v->size = 2; }
+            else if (!strcmp(line, "vec3b")) { v->type = SAS_BOOL; v->size = 3; }
+            else if (!strcmp(line, "vec4b")) { v->type = SAS_BOOL; v->size = 4; }
+            else if (!strcmp(line, "mat2")) { v->type = SAS_FLOAT; v->size = 4; }
+            else if (!strcmp(line, "mat3")) { v->type = SAS_FLOAT; v->size = 9; }
+            else if (!strcmp(line, "mat4")) { v->type = SAS_FLOAT; v->size = 16; }
+            else
+            {
+                shaders[id]->log = malloc(128);
+                sprintf(shaders[id]->log, "Unknown varying type %s.", line);
+                shaders[id]->log_len = strlen(shaders[id]->log) + 1;
+
+                fclose(tfp);
+
+                remove("/tmp/.soft-and-slow.varyings");
+                remove("/tmp/.soft-and-slow.cpp");
+                return;
+            }
+
+            if (fgets(line, 256, tfp) == NULL)
+            {
+                free(v->identifier);
+                free(v);
+                break;
+            }
+
+            if (line[strlen(line) - 1] == '\n')
+                line[strlen(line) - 1] = 0;
+
+            v->identifier = strdup(line);
+
+
+            *lvp = v;
+            lvp = &v->next;
+        }
+
+        fclose(tfp);
+        remove("/tmp/.soft-and-slow.varyings");
+    }
+
+
+    if (system("g++ -Wall -Wextra -std=gnu++0x -O3 -fPIC -c /tmp/.soft-and-slow.cpp -o /tmp/.soft-and-slow.o &> /tmp/.soft-and-slow.complog"))
+    {
+        tfp = fopen("/tmp/.soft-and-slow.complog", "r");
+        if (tfp != NULL)
+        {
+            fseek(tfp, 0, SEEK_END);
+            shaders[id]->log_len = ftell(tfp) + 1;
+            rewind(tfp);
+
+            shaders[id]->log = malloc(shaders[id]->log_len);
+            fread(shaders[id]->log, 1, shaders[id]->log_len - 1, tfp);
+
+            shaders[id]->log[shaders[id]->log_len - 1] = 0;
+
+            fclose(tfp);
+
+            remove("/tmp/.soft-and-slow.complog");
+        }
+
+        remove("/tmp/.soft-and-slow.cpp");
         return;
     }
 
 
+    // Includes are required by general-shader-common.cpp
     remove("/tmp/.soft-and-slow.cpp");
 
     tfp = fopen("/tmp/.soft-and-slow.o", "rb");
@@ -282,7 +440,17 @@ void glLinkProgram(GLuint id)
 
 
     if (programs[id]->dl != NULL)
+    {
         dlclose(programs[id]->dl);
+
+        struct program_varyings *v = programs[id]->varyings;
+        while (v != NULL)
+        {
+            struct program_varyings *vn = v->next;
+            free(v);
+            v = vn;
+        }
+    }
 
 
     for (int i = 0; i < SAS_MAX_UNIFORMS; i++)
@@ -302,8 +470,14 @@ void glLinkProgram(GLuint id)
     char soname[64];
     sprintf(soname, "/tmp/.soft-and-slow-%i.so", (int)id);
 
-    char cmd[128];
-    sprintf(cmd, "ld -fPIC -shared /tmp/.soft-and-slow-0x*.o -o %s", soname);
+
+    FILE *tfp = fopen("/tmp/.soft-and-slow-common.cpp", "w");
+    fwrite(&_binary_general_shader_common_cpp_start, 1, (size_t)&_binary_general_shader_common_cpp_size, tfp);
+    fclose(tfp);
+
+
+    char cmd[192];
+    sprintf(cmd, "g++ -Wall -Wextra -std=gnu++0x -O3 -fPIC -shared /tmp/.soft-and-slow-common.cpp /tmp/.soft-and-slow-0x*.o -o %s", soname);
 
     if (system(cmd))
     {
@@ -311,7 +485,7 @@ void glLinkProgram(GLuint id)
         return;
     }
 
-    system("rm /tmp/.soft-and-slow-0x*.o");
+    system("rm /tmp/.soft-and-slow-0x*.o /tmp/.soft-and-slow-common.cpp");
 
 
     programs[id]->dl = dlopen(soname, RTLD_NOW);
@@ -320,6 +494,35 @@ void glLinkProgram(GLuint id)
     {
         fprintf(stderr, "Could not load shared library (%s).\n", dlerror());
         return;
+    }
+
+
+    struct program_varyings **vp = &programs[id]->varyings;
+    for (struct sas_shader_list *sl = programs[id]->shaders; sl != NULL; sl = sl->next)
+    {
+        struct shader_varyings *sv = sl->shader->varyings;
+
+        while (sv != NULL)
+        {
+            char real_identifier[strlen(sv->identifier) + 13];
+            strcpy(real_identifier, "sas_varying_");
+            strcat(real_identifier, sv->identifier);
+
+            void *addr = dlsym(programs[id]->dl, real_identifier);
+            assert(addr);
+
+
+            struct program_varyings *pv = calloc(1, sizeof(*pv));
+            pv->address = addr;
+            pv->type = sv->type;
+            pv->size = sv->size;
+
+            *vp = pv;
+            vp = &pv->next;
+
+
+            sv = sv->next;
+        }
     }
 }
 
@@ -336,6 +539,7 @@ void glDeleteShader(GLuint id)
     {
         free(shaders[id]->source);
         free(shaders[id]->compiled);
+        free(shaders[id]->log);
         free(shaders[id]);
 
         shaders[id] = NULL;
@@ -345,8 +549,17 @@ void glDeleteShader(GLuint id)
 
 void glUseProgram(GLuint id)
 {
+    if (programs[id] == NULL)
+    {
+        sas_error = GL_INVALID_VALUE;
+        return;
+    }
+
+
     sas_vertex_transformation   = (void (*)(void))(uintptr_t)dlsym(programs[id]->dl, "sas_vertex_transform");
     sas_fragment_transformation = (void (*)(void))(uintptr_t)dlsym(programs[id]->dl, "sas_fragment_transform");
+
+    current_program = programs[id];
 }
 
 
@@ -398,4 +611,142 @@ void glUniform1i(GLint location, GLint v0)
 
 
     *(GLint *)programs[prog]->uniforms[location] = v0;
+}
+
+void glUniform1f(GLint location, GLfloat v0)
+{
+    GLuint prog = location / SAS_MAX_UNIFORMS;
+    location %= SAS_MAX_UNIFORMS;
+
+    if ((programs[prog] == NULL) || (programs[prog]->uniforms[location] == NULL))
+    {
+        sas_error = GL_INVALID_VALUE;
+        return;
+    }
+
+
+    ((GLfloat *)programs[prog]->uniforms[location])[0] = v0;
+}
+
+void glUniform3f(GLint location, GLfloat v0, GLfloat v1, GLfloat v2)
+{
+    GLuint prog = location / SAS_MAX_UNIFORMS;
+    location %= SAS_MAX_UNIFORMS;
+
+    if ((programs[prog] == NULL) || (programs[prog]->uniforms[location] == NULL))
+    {
+        sas_error = GL_INVALID_VALUE;
+        return;
+    }
+
+
+    ((GLfloat *)programs[prog]->uniforms[location])[0] = v0;
+    ((GLfloat *)programs[prog]->uniforms[location])[1] = v1;
+    ((GLfloat *)programs[prog]->uniforms[location])[2] = v2;
+}
+
+
+void glGetShaderiv(GLuint id, GLenum pname, GLint *params)
+{
+    if (shaders[id] == NULL)
+    {
+        sas_error = GL_INVALID_VALUE;
+        return;
+    }
+
+
+    switch (pname)
+    {
+        case GL_SHADER_TYPE:
+            *params = shaders[id]->type;
+            return;
+        case GL_COMPILE_STATUS:
+            *params = shaders[id]->compiled_len ? GL_TRUE : GL_FALSE;
+            return;
+        case GL_INFO_LOG_LENGTH:
+            *params = shaders[id]->log_len;
+            return;
+    }
+
+    sas_error = GL_INVALID_ENUM;
+}
+
+void glGetShaderInfoLog(GLuint id, GLsizei max_length, GLsizei *length, GLchar *log)
+{
+    if ((shaders[id] == NULL) || (max_length <= 0))
+    {
+        sas_error = GL_INVALID_VALUE;
+        return;
+    }
+
+
+    if ((unsigned)max_length >= shaders[id]->log_len)
+    {
+        memcpy(log, shaders[id]->log, shaders[id]->log_len);
+
+        if (length != NULL)
+            *length = shaders[id]->log_len - 1;
+    }
+    else
+    {
+        memcpy(log, shaders[id]->log, --max_length);
+        log[max_length] = 0;
+
+        if (length != NULL)
+            *length = max_length;
+    }
+}
+
+
+void sas_varyings_alloc(size_t sz)
+{
+    for (struct program_varyings *pv = current_program->varyings; pv != NULL; pv = pv->next)
+    {
+        free(pv->saved_values);
+
+        pv->saved_values = malloc(sz * varying_type_sizes[pv->type] * pv->size);
+    }
+
+    varying_index = 0;
+}
+
+void sas_flush_varyings(void)
+{
+    varying_index = 0;
+}
+
+void sas_push_varyings(void)
+{
+    for (struct program_varyings *pv = current_program->varyings; pv != NULL; pv = pv->next)
+        memcpy((void *)((uintptr_t)pv->saved_values + varying_index * varying_type_sizes[pv->type] * pv->size), pv->address, varying_type_sizes[pv->type] * pv->size);
+
+    varying_index++;
+}
+
+// TODO: Optimize; this one is called really often (when using other varyings
+// than the built-in ones).
+void sas_calc_varyings(int i1, int i2, int i3, float w1, float w2, float w3, float dd)
+{
+    for (struct program_varyings *pv = current_program->varyings; pv != NULL; pv = pv->next)
+    {
+        int sz = pv->size;
+
+        switch (pv->type)
+        {
+            case SAS_FLOAT:
+                for (int i = 0; i < sz; i++)
+                    pv->val_float[i] = (pv->saved_float[i1 * sz + i] * w1 + pv->saved_float[i2 * sz + i] * w2 + pv->saved_float[i3 * sz + i] * w3) * dd;
+                break;
+            case SAS_INT:
+                for (int i = 0; i < sz; i++)
+                    pv->val_int[i] = (int)((pv->saved_int[i1 * sz + i] * w1 + pv->saved_int[i2 * sz + i] * w2 + pv->saved_int[i3 * sz + i] * w3) * dd);
+                break;
+            case SAS_BOOL:
+                // TODO: How the Sam Hill are we supposed to work here? Is this
+                // even legal?
+                for (int i = 0; i < sz; i++)
+                    pv->val_bool[i] = !!((pv->saved_bool[i1 * sz + i] * w1 + pv->saved_bool[i2 * sz + i] * w2 + pv->saved_bool[i3 * sz + i] * w3) * dd);
+                break;
+        }
+    }
 }

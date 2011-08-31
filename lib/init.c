@@ -53,5 +53,7 @@ void sas_init(void)
     glUseProgram(0);
 
 
+    glUniform1i(glGetUniformLocation(0, "display_texture"), 0);
+
     glActiveTexture(GL_TEXTURE0);
 }
