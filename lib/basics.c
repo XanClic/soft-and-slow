@@ -24,6 +24,9 @@ extern bool sas_do_depth_test, sas_do_alpha_test, sas_2d_textures_enabled;
 extern bool (*sas_depth_func)(float new, float current);
 extern bool (*sas_alpha_func)(float new, float ref);
 
+extern bool sas_do_cw_culling, sas_do_ccw_culling;
+extern GLenum sas_cull_face, sas_front_face;
+
 
 void glClearColor(GLclampf r, GLclampf g, GLclampf b, GLclampf a)
 {
@@ -92,6 +95,27 @@ void glEnable(GLenum cap)
         case GL_ALPHA_TEST:
             sas_do_alpha_test = true;
             break;
+        case GL_CULL_FACE:
+            sas_do_cw_culling = sas_do_ccw_culling = false;
+            switch (sas_cull_face)
+            {
+                case GL_FRONT_AND_BACK:
+                    sas_do_cw_culling = sas_do_ccw_culling = true;
+                    break;
+                case GL_FRONT:
+                    if (sas_front_face == GL_CW)
+                        sas_do_cw_culling = true;
+                    else
+                        sas_do_ccw_culling = true;
+                    break;
+                case GL_BACK:
+                    if (sas_front_face == GL_CW)
+                        sas_do_ccw_culling = true;
+                    else
+                        sas_do_cw_culling = true;
+                    break;
+            }
+            break;
         case GL_DEPTH_TEST:
             sas_do_depth_test = true;
             break;
@@ -110,6 +134,9 @@ void glDisable(GLenum cap)
         case GL_ALPHA_TEST:
             sas_do_alpha_test = false;
             break;
+        case GL_CULL_FACE:
+            sas_do_cw_culling = sas_do_ccw_culling = false;
+            break;
         case GL_DEPTH_TEST:
             sas_do_depth_test = false;
             break;
@@ -127,6 +154,8 @@ GLboolean glIsEnabled(GLenum cap)
     {
         case GL_ALPHA_TEST:
             return sas_do_alpha_test;
+        case GL_CULL_FACE:
+            return sas_do_cw_culling || sas_do_ccw_culling;
         case GL_DEPTH_TEST:
             return sas_do_depth_test;
         case GL_TEXTURE_2D:
@@ -136,4 +165,47 @@ GLboolean glIsEnabled(GLenum cap)
     }
 
     return false;
+}
+
+
+GLenum glGetError(void)
+{
+    // FIXME: Should not return the last error but the first
+    GLenum val = sas_error;
+    sas_error = GL_NO_ERROR;
+
+    return val;
+}
+
+
+GLvoid glCullFace(GLenum mode)
+{
+    if ((mode != GL_BACK) && (mode != GL_FRONT) && (mode != GL_FRONT_AND_BACK))
+    {
+        sas_error = GL_INVALID_ENUM;
+        return;
+    }
+
+
+    sas_cull_face = mode;
+
+    // Reset modes
+    if (glIsEnabled(GL_CULL_FACE))
+        glEnable(GL_CULL_FACE);
+}
+
+GLvoid glFrontFace(GLenum mode)
+{
+    if ((mode != GL_CCW) && (mode != GL_CW))
+    {
+        sas_error = GL_INVALID_ENUM;
+        return;
+    }
+
+
+    sas_front_face = mode;
+
+    // Reset modes
+    if (glIsEnabled(GL_CULL_FACE))
+        glEnable(GL_CULL_FACE);
 }

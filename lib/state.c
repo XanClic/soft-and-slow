@@ -3,6 +3,7 @@
 
 #include <soft-and-slow/constants.h>
 #include <soft-and-slow/context.h>
+#include <soft-and-slow/limits.h>
 #include <soft-and-slow/matrix.h>
 #include <soft-and-slow/types.h>
 
@@ -31,6 +32,12 @@ SAS_MATRIX_TYPE sas_modelviewprojection[16] = {
     0., 0., 1., 0.,
     0., 0., 0., 1.
 };
+// FIXME FIXME FIXME
+SAS_MATRIX_TYPE sas_normal_matrix[9] = {
+    1.,  0.,  0.,
+    0.,  0.,  1.,
+    0., -1.,  0.
+};
 
 SAS_MATRIX_TYPE *sas_current_matrix = sas_modelview;
 
@@ -45,6 +52,9 @@ sas_color_t sas_current_color = { .r = 1.f, .g = 1.f, .b = 1.f, .a = 1.f };
 
 
 bool sas_do_depth_test = false, sas_do_alpha_test = false;
+// Cull clockwise or counter-clockwise faces, respectively
+bool sas_do_cw_culling = false, sas_do_ccw_culling = false;
+GLenum sas_cull_face = GL_BACK, sas_front_face = GL_CCW;
 
 float sas_alpha_ref;
 
@@ -56,8 +66,10 @@ void (*sas_vertex_transformation)(void);
 void (*sas_fragment_transformation)(void);
 
 
-float sas_current_texcoord[8][4], sas_multi_texcoord0[4];
+float sas_current_texcoord[SAS_TEX_UNITS][4], sas_multi_texcoord0[4];
 float sas_current_vertex[4], sas_current_position[4];
+
+unsigned sas_current_buf_index;
 
 float sas_triangle_positions[3][4], sas_triangle_texcoords[3][4];
 sas_color_t sas_triangle_colors[3];
@@ -70,3 +82,6 @@ int sas_quad_index;
 
 int sas_current_texture_unit;
 bool sas_2d_textures_enabled;
+
+sas_texture_2d_t *sas_textures_2d[SAS_TEXTURES];
+GLuint sas_texture_units_2d[SAS_TEX_UNITS];

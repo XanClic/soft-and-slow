@@ -11,7 +11,9 @@ struct sas_matrix_stack
 };
 
 
-void sas_multiply_matrix(SAS_MATRIX_TYPE *d, SAS_MATRIX_TYPE *s);
-void sas_matrix_dot_vector(SAS_MATRIX_TYPE *matrix, SAS_MATRIX_TYPE *vector);
+void sas_multiply_matrix(SAS_MATRIX_TYPE *d, const SAS_MATRIX_TYPE *s);
+void sas_matrix_dot_vector(const SAS_MATRIX_TYPE *matrix, SAS_MATRIX_TYPE *vector);
+void sas_multiply_matrix_3x3(SAS_MATRIX_TYPE *d, const SAS_MATRIX_TYPE *s);
+void sas_matrix_dot_vector_3x3(const SAS_MATRIX_TYPE *matrix, SAS_MATRIX_TYPE *vector);
 
 #endif

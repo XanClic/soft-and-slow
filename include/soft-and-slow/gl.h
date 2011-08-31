@@ -1,5 +1,21 @@
+#if defined __gl_h__ || defined __gl_h_ || defined __gl_h || defined gl_h || defined _gl_h || defined _gl_h_
+#warning "Won't using soft-and-slow/gl.h, since GL/gl.h has already been included."
+#else
 #ifndef SAS_GL_H
 #define SAS_GL_H
+#define __gl_h__
+#define __gl_h_
+#define __gl_h
+#define  _gl_h_
+#define  _gl_h
+#define   gl_h
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+    
+
+#include "types.h"
 
 #include "constants.h"
 #include "types.h"
@@ -14,6 +30,9 @@ void glEnable(GLenum cap);
 void glDisable(GLenum cap);
 GLboolean glIsEnabled(GLenum cap);
 void glGetFloatv(GLenum pname, float *params);
+GLenum glGetError(void);
+void glCullFace(GLenum mode);
+void glFrontFace(GLenum mode);
 
 void glDepthFunc(GLenum func);
 void glAlphaFunc(GLenum func, GLclampf ref);
@@ -41,5 +60,15 @@ void glTexCoord2f(GLfloat s, GLfloat t);
 void glVertex3f(GLfloat x, GLfloat y, GLfloat z);
 
 void glActiveTexture(GLenum unit);
+void glBindTexture(GLenum target, GLuint id);
+void glGenTextures(GLsizei n, GLuint *textures);
+void glTexImage2D(GLenum target, GLint level, GLint internal_format, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const GLvoid *data);
+void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *data);
 
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
 #endif

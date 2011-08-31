@@ -1,14 +1,14 @@
-#include <stddef.h>
+#include <cstddef>
 
-#include <SFML/Graphics.h>
-#include <SFML/OpenGL.h>
-#include <SFML/System.h>
-#include <SFML/Window.h>
+#include <SFML/Graphics.hpp>
+#include <SFML/OpenGL.hpp>
+#include <SFML/System.hpp>
+#include <SFML/Window.hpp>
 
 
 int main(void)
 {
-    sfWindow *wnd = sfWindow_Create((sfVideoMode){ 640, 480, 32 }, "test", sfTitlebar | sfClose, NULL);
+    sf::Window *wnd = new sf::Window(sf::VideoMode(640, 480), "test");
 
 
     glMatrixMode(GL_PROJECTION);
@@ -40,9 +40,10 @@ int main(void)
 
     glEnable(GL_TEXTURE_2D);
 
-    sfTexture *t = sfTexture_CreateFromFile("checkerboard.png", NULL);
-    sfTexture_SetSmooth(t, 0);
-    sfTexture_Bind(t);
+    sf::Texture t;
+    t.LoadFromFile("checkerboard.png");
+    t.SetSmooth(0);
+    t.Bind();
 
     glTranslatef(1.5f, 0.f, 0.f);
 
@@ -57,7 +58,7 @@ int main(void)
 
 
     for (;;)
-        sfWindow_Display(wnd);
+        wnd->Display();
 
 
     return 0;
