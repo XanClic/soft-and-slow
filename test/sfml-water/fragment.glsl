@@ -17,12 +17,12 @@ void main(void)
     u = mod(u, 1.);
     v = mod(v, 1.);
 
-    float y1 = texture2D(heightmap, vec2(u, v)).r / 64.;
-    float y2 = texture2D(heightmap, vec2(u + e, v)).r / 64.;
-    float y3 = texture2D(heightmap, vec2(u, v + e)).r / 64.;
+    float z1 = texture2D(heightmap, vec2(u, v)).r / 64.;
+    float z2 = texture2D(heightmap, vec2(u + e, v)).r / 64.;
+    float z3 = texture2D(heightmap, vec2(u, v + e)).r / 64.;
 
     // Normalenvektor der Heightmap
-    vec3 n = normalize(gl_NormalMatrix * (e * vec3(y2 - y1, -e, y3 - y1)));
+    vec3 n = normalize(gl_NormalMatrix * (e * vec3(z1 - z2, z1 - z3, e)));
 
     vec3 sr = reflect(vec3(0., 0., -1.), n);
 

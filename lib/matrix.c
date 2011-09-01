@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,11 +35,24 @@ void glMatrixMode(GLenum mode)
 }
 
 
-// Updates the modelview-projection matrix
+// Updates the modelview-projection and the normal matrix
 void sas_update_mvp(void)
 {
     memcpy(sas_modelviewprojection, sas_projection, sizeof(sas_projection));
     sas_multiply_matrix(sas_modelviewprojection, sas_modelview);
+
+
+    SAS_MATRIX_TYPE tmp[9];
+
+    for (int x = 0; x < 3; x++)
+        for (int y = 0; y < 3; y++)
+            tmp[x * 3 + y] = sas_modelview[x * 4 + y];
+
+    sas_invert_matrix_3x3(tmp);
+
+    for (int x = 0; x < 3; x++)
+        for (int y = 0; y < 3; y++)
+            sas_normal_matrix[y * 3 + x] = tmp[x * 3 + y];
 }
 
 
@@ -165,6 +179,34 @@ void sas_multiply_matrix_3x3(SAS_MATRIX_TYPE *d, const SAS_MATRIX_TYPE *s)
     memcpy(d, nm, sizeof(nm));
 }
 
+void sas_invert_matrix_3x3(SAS_MATRIX_TYPE *d)
+{
+    SAS_MATRIX_TYPE tmp[9];
+
+
+    float rcp_determinant = d[0] * (d[4] * d[8] - d[5] * d[7]) -
+                            d[3] * (d[1] * d[8] - d[2] * d[7]) +
+                            d[6] * (d[1] * d[5] - d[2] * d[4]);
+
+    if (!rcp_determinant)
+        return;
+
+    rcp_determinant = 1.f / rcp_determinant;
+
+    tmp[0] = rcp_determinant * (d[4] * d[8] - d[5] * d[7]);
+    tmp[1] = rcp_determinant * (d[2] * d[7] - d[1] * d[8]);
+    tmp[2] = rcp_determinant * (d[1] * d[5] - d[2] * d[4]);
+    tmp[3] = rcp_determinant * (d[5] * d[6] - d[3] * d[8]);
+    tmp[4] = rcp_determinant * (d[0] * d[8] - d[2] * d[6]);
+    tmp[5] = rcp_determinant * (d[2] * d[3] - d[0] * d[5]);
+    tmp[6] = rcp_determinant * (d[3] * d[7] - d[4] * d[6]);
+    tmp[7] = rcp_determinant * (d[1] * d[6] - d[0] * d[7]);
+    tmp[8] = rcp_determinant * (d[0] * d[4] - d[1] * d[3]);
+
+
+    memcpy(d, tmp, sizeof(tmp));
+}
+
 
 void glRotatef(GLfloat angle, GLfloat x, GLfloat y, GLfloat z)
 {
@@ -194,16 +236,6 @@ void glRotatef(GLfloat angle, GLfloat x, GLfloat y, GLfloat z)
     };
 
     glMultMatrixf(rot_mat);
-
-
-    // FIXME FIXME FIXME
-    float tmp[9] = {
-        x * x * omc +     c,   y * x * omc + z * s,   z * x * omc - y * s,
-        x * y * omc - z * s,   y * y * omc +     c,   z * y * omc + x * s,
-        x * z * omc + y * s,   y * z * omc - x * s,   z * z * omc +     c
-    };
-
-    sas_multiply_matrix_3x3(sas_normal_matrix, tmp);
 }
 
 void glRotated(GLdouble angle, GLdouble x, GLdouble y, GLdouble z)
