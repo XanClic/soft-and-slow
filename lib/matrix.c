@@ -42,17 +42,13 @@ void sas_update_mvp(void)
     sas_multiply_matrix(sas_modelviewprojection, sas_modelview);
 
 
-    SAS_MATRIX_TYPE tmp[9];
-
+    // Actually it's defined as the transposed inverse, but the inverse
+    // transposed is effectively the same thing.
     for (int x = 0; x < 3; x++)
         for (int y = 0; y < 3; y++)
-            tmp[x * 3 + y] = sas_modelview[x * 4 + y];
+            sas_normal_matrix[y * 3 + x] = sas_modelview[x * 4 + y];
 
-    sas_invert_matrix_3x3(tmp);
-
-    for (int x = 0; x < 3; x++)
-        for (int y = 0; y < 3; y++)
-            sas_normal_matrix[y * 3 + x] = tmp[x * 3 + y];
+    sas_invert_matrix_3x3(sas_normal_matrix);
 }
 
 
