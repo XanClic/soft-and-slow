@@ -56,6 +56,7 @@ struct program_varyings
         uint8_t *val_bool;
         int *val_int;
         float *val_float;
+        sas_xmm_t *val_xmm;
 
         void *address;
     };
@@ -71,6 +72,7 @@ struct program_varyings
         uint8_t *saved_bool;
         int *saved_int;
         float *saved_float;
+        sas_xmm_t *saved_xmm;
 
         void *saved_values;
     };
@@ -116,7 +118,7 @@ static struct sas_shader *shaders[SAS_MAX_SHADERS];
 
 static struct sas_program *current_program = NULL;
 
-static const size_t varying_type_sizes[] = { sizeof(uint8_t), sizeof(int), sizeof(float) };
+static const size_t varying_type_sizes[] = { sizeof(uint8_t), sizeof(int), sizeof(float), sizeof(sas_xmm_t) };
 static int varying_index = 0;
 
 
@@ -323,9 +325,12 @@ void glCompileShader(GLuint id)
             if (!strcmp(line, "float")) { v->type = SAS_FLOAT; v->size = 1; }
             else if (!strcmp(line, "int")) { v->type = SAS_INT; v->size = 1; }
             else if (!strcmp(line, "bool")) { v->type = SAS_BOOL; v->size = 1; }
-            else if (!strcmp(line, "vec2")) { v->type = SAS_FLOAT; v->size = 2; }
-            else if (!strcmp(line, "vec3")) { v->type = SAS_FLOAT; v->size = 3; }
-            else if (!strcmp(line, "vec4")) { v->type = SAS_FLOAT; v->size = 4; }
+            // Just hoping gcc actually uses 16 bytes to store those classes.
+            // I tried to add padding floats, but all it did was segfaulting or
+            // doing the wrong thing™.
+            else if (!strcmp(line, "vec2")) { v->type = SAS_XMM; v->size = 1; }
+            else if (!strcmp(line, "vec3")) { v->type = SAS_XMM; v->size = 1; }
+            else if (!strcmp(line, "vec4")) { v->type = SAS_XMM; v->size = 1; }
             else if (!strcmp(line, "vec2i")) { v->type = SAS_INT; v->size = 2; }
             else if (!strcmp(line, "vec3i")) { v->type = SAS_INT; v->size = 3; }
             else if (!strcmp(line, "vec4i")) { v->type = SAS_INT; v->size = 4; }
@@ -731,22 +736,55 @@ void sas_calc_varyings(int i1, int i2, int i3, float w1, float w2, float w3, flo
     {
         int sz = pv->size;
 
-        switch (pv->type)
+#ifdef USE_ASSEMBLY
+        if ((pv->size == 1) && (pv->type == SAS_XMM))
         {
-            case SAS_FLOAT:
-                for (int i = 0; i < sz; i++)
-                    pv->val_float[i] = (pv->saved_float[i1 * sz + i] * w1 + pv->saved_float[i2 * sz + i] * w2 + pv->saved_float[i3 * sz + i] * w3) * dd;
-                break;
-            case SAS_INT:
-                for (int i = 0; i < sz; i++)
-                    pv->val_int[i] = (int)((pv->saved_int[i1 * sz + i] * w1 + pv->saved_int[i2 * sz + i] * w2 + pv->saved_int[i3 * sz + i] * w3) * dd);
-                break;
-            case SAS_BOOL:
-                // TODO: How the Sam Hill are we supposed to work here? Is this
-                // even legal?
-                for (int i = 0; i < sz; i++)
-                    pv->val_bool[i] = !!((pv->saved_bool[i1 * sz + i] * w1 + pv->saved_bool[i2 * sz + i] * w2 + pv->saved_bool[i3 * sz + i] * w3) * dd);
-                break;
+            // Treat that case as a special one. (Hint: Could we save the
+            // pshufd'd wX/dd in some XMM register? Would that be of any good?)
+            // (FIXME btw: Add another 4-float type instead of that sas_color_t
+            // stuff)
+            __asm__ __volatile__ ("pshufd xmm0,%4,0x00;"
+                                  "mulps  xmm0,%1;"
+                                  "pshufd xmm1,%5,0x00;"
+                                  "mulps  xmm1,%2;"
+                                  "addps  xmm0,xmm1;"
+                                  "pshufd xmm1,%6,0x00;"
+                                  "mulps  xmm1,%3;"
+                                  "addps  xmm0,xmm1;"
+                                  "pshufd xmm1,%7,0x00;"
+                                  "mulps  xmm0,xmm1;"
+                                  "movaps %0,xmm0"
+                                  : "=m"(*pv->val_xmm)
+                                  : "m"(pv->saved_xmm[i1]), "m"(pv->saved_xmm[i2]), "m"(pv->saved_xmm[i3]), "x"(w1), "x"(w2), "x"(w3), "x"(dd)
+                                  : "xmm0", "xmm1");
         }
+        else
+        {
+#endif
+            switch (pv->type)
+            {
+                case SAS_XMM:
+                    sz *= 4;
+                    for (int i = 0; i < sz; i++)
+                        pv->val_float[i] = (pv->saved_float[i1 * sz + i] * w1 + pv->saved_float[i2 * sz + i] * w2 + pv->saved_float[i3 * sz + i] * w3) * dd;
+                    break;
+                case SAS_FLOAT:
+                    for (int i = 0; i < sz; i++)
+                        pv->val_float[i] = (pv->saved_float[i1 * sz + i] * w1 + pv->saved_float[i2 * sz + i] * w2 + pv->saved_float[i3 * sz + i] * w3) * dd;
+                    break;
+                case SAS_INT:
+                    for (int i = 0; i < sz; i++)
+                    pv->val_int[i] = (int)((pv->saved_int[i1 * sz + i] * w1 + pv->saved_int[i2 * sz + i] * w2 + pv->saved_int[i3 * sz + i] * w3) * dd);
+                    break;
+                case SAS_BOOL:
+                    // TODO: How the Sam Hill are we supposed to work here? Is this
+                    // even legal?
+                    for (int i = 0; i < sz; i++)
+                        pv->val_bool[i] = !!((pv->saved_bool[i1 * sz + i] * w1 + pv->saved_bool[i2 * sz + i] * w2 + pv->saved_bool[i3 * sz + i] * w3) * dd);
+                break;
+            }
+#ifdef USE_ASSEMBLY
+        }
+#endif
     }
 }

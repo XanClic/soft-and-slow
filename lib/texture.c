@@ -41,7 +41,7 @@ sas_color_t sas_texture_get(int unit, float u, float v)
 
     u = clampf(u);
     v = clampf(v);
-    
+
 
     unsigned x = (u == 1.f) ? (t->width  - 1) : (unsigned)(u * t->width );
     unsigned y = (v == 1.f) ? (t->height - 1) : (unsigned)(v * t->height);

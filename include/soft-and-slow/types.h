@@ -88,7 +88,23 @@ enum sas_varying_types
 {
     SAS_BOOL,
     SAS_INT,
-    SAS_FLOAT
+    SAS_FLOAT,
+    SAS_XMM
 };
+
+
+// One SSE register
+typedef struct sas_xmm sas_xmm_t;
+
+struct sas_xmm
+{
+    union
+    {
+        float    s[4];
+        double   d[2];
+        uint32_t i[4];
+        uint8_t  b[16];
+    };
+} cc_packed;
 
 #endif
