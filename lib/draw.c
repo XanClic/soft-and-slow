@@ -34,10 +34,6 @@ extern bool sas_do_cw_culling, sas_do_ccw_culling;
 extern unsigned sas_current_buf_index;
 
 
-// Current value for the check buffer
-static uint8_t primitive_counter = 1;
-
-
 void glBegin(GLenum mode)
 {
     switch (mode)
@@ -54,6 +50,11 @@ void glBegin(GLenum mode)
         case GL_QUADS:
             sas_quad_index = 0;
             sas_current_mode = GL_QUADS;
+            sas_varyings_alloc(4);
+            break;
+        case GL_QUAD_STRIP:
+            sas_quad_index = 0;
+            sas_current_mode = GL_QUAD_STRIP;
             sas_varyings_alloc(4);
             break;
         default:
@@ -84,42 +85,32 @@ void glTexCoord2f(GLfloat s, GLfloat v)
 }
 
 
-static float pos_multiplier[4] = { .5f, .5f, .5f, 1.f };
-static float pos_addend[4]     = { .5f, .5f, .5f, 0.f };
 static float xmm_one[4]        = { 1.f, 1.f, 1.f, 1.f };
 
 
 // Fills a triangle.
 void sas_do_triangle(sas_color_t c1, float *t1, float *v1, int i1, sas_color_t c2, float *t2, float *v2, int i2, sas_color_t c3, float *t3, float *v3, int i3)
 {
-#ifdef USE_ASSEMBLY
-    float vec1[4], vec2[4];
-
-    __asm__ __volatile__ ("movaps xmm0,[%2];"
-                          "movaps xmm1,[%3];"
-                          "movaps xmm2,[%4];"
-                          "subps  xmm1,xmm0;"
-                          "subps  xmm2,xmm0;"
-                          "movaps %0  ,xmm1;"
-                          "movaps %1  ,xmm2;"
-                          : "=m"(vec1), "=m"(vec2)
-                          : "r"(v1), "r"(v2), "r"(v3)
-                          : "xmm0", "xmm1", "xmm2");
-#else
     float vec1[4] = {
-        v2[0] - v1[0],
-        v2[1] - v1[1],
-        v2[2] - v1[2],
-        v2[3] - v1[3]
+        (v2[0] - v1[0]) * .5f,
+        (v2[1] - v1[1]) * .5f,
+        (v2[2] - v1[2]) * .5f,
+         v2[3] - v1[3]
     };
 
     float vec2[4] = {
-        v3[0] - v1[0],
-        v3[1] - v1[1],
-        v3[2] - v1[2],
-        v3[3] - v1[3]
+        (v3[0] - v1[0]) * .5f,
+        (v3[1] - v1[1]) * .5f,
+        (v3[2] - v1[2]) * .5f,
+         v3[3] - v1[3]
     };
-#endif
+
+    float bv[4] = {
+        v1[0] * .5f + .5f,
+        v1[1] * .5f + .5f,
+        v1[2] * .5f + .5f,
+        v1[3]
+    };
 
     if (sas_do_cw_culling || sas_do_ccw_culling)
     {
@@ -143,55 +134,51 @@ void sas_do_triangle(sas_color_t c1, float *t1, float *v1, int i1, sas_color_t c
     float d3 = .5f - v3[2] / 2.f;
 
 
-    // This isn't actually true as it draws too many pixels -- but it works.
-    float unit1 = 1.f / sqrtf(vec1[0] * vec1[0] * current_sas_context->width * current_sas_context->width + vec1[1] * vec1[1] * current_sas_context->height * current_sas_context->height);
-    float unit2 = 1.f / sqrtf(vec2[0] * vec2[0] * current_sas_context->width * current_sas_context->width + vec2[1] * vec2[1] * current_sas_context->height * current_sas_context->height);
+    float st_div = 1.f / (vec1[0] * vec2[1] - vec1[1] * vec2[0]);
 
 
-    bool s_set_to_one = false;
+    int start_x = (int)floorf((min(v1[0], min(v2[0], v3[0])) * .5f + .5f) * current_sas_context->width );
+    int end_x   = (int)ceilf ((max(v1[0], max(v2[0], v3[0])) * .5f + .5f) * current_sas_context->width );
+    int start_y = (int)floorf((.5f - max(v1[1], max(v2[1], v3[1])) * .5f) * current_sas_context->height);
+    int end_y   = (int)ceilf ((.5f - min(v1[1], min(v2[1], v3[1])) * .5f) * current_sas_context->height);
 
-    for (float s = 0.f; s <= 1.f; s += unit1)
+    if (start_x < 0)
+        start_x = 0;
+    if (start_y < 0)
+        start_y = 0;
+
+    if (end_x >= (int)current_sas_context->width)
+        end_x = current_sas_context->width - 1;
+    if (end_y >= (int)current_sas_context->height)
+        end_y = current_sas_context->height - 1;
+
+
+    for (int y = start_y; y < end_y; y++)
     {
-        bool t_set_to_one = false;
+        sas_current_buf_index = y * current_sas_context->width + start_x;
 
-        for (float t = 0.f; t <= 1.f - s; t += unit2)
+        for (int x = start_x; x < end_x; x++)
         {
-#ifdef USE_ASSEMBLY
-            __asm__ __volatile__ ("pshufd   xmm8,%1,0x00;"
-                                  "mulps    xmm8,[%4];"
-                                  "pshufd   xmm9,%2,0x00;"
-                                  "mulps    xmm9,[%5];"
-                                  "addps    xmm8,xmm9;"
-                                  "addps    xmm8,[%3];"
-                                  "mulps    xmm8,[%6];"
-                                  "addps    xmm8,[%7];"
-                                  "movaps   %0,xmm8"
-                                  : "=m"(sas_current_position)
-                                  : "x"(s), "x"(t), "r"(v1), "r"(vec1), "r"(vec2), "r"(pos_multiplier), "r"(pos_addend)
-                                  : "xmm8", "xmm9");
-#else
-            sas_current_position[0] = v1[0] + s * vec1[0] + t * vec2[0];
-            sas_current_position[1] = v1[1] + s * vec1[1] + t * vec2[1];
-            sas_current_position[2] = v1[2] + s * vec1[2] + t * vec2[2];
-            sas_current_position[3] = v1[3] + s * vec1[3] + t * vec2[3];
+            sas_current_position[0] =       (float)x / (float)current_sas_context->width;
+            sas_current_position[1] = 1.f - (float)y / (float)current_sas_context->height;
 
-            // Bring to [0; 1]
-            sas_current_position[0] = sas_current_position[0] * .5f + .5f;
-            sas_current_position[1] = sas_current_position[1] * .5f + .5f;
-            sas_current_position[2] = sas_current_position[2] * .5f + .5f;
-#endif
+            sas_current_buf_index++;
 
-            if ((sas_current_position[0] < 0.f) || (sas_current_position[0] >= 1.f) ||
-                (sas_current_position[1] < 0.f) || (sas_current_position[1] >= 1.f) ||
-                (sas_current_position[2] < 0.f) || (sas_current_position[2] >= 1.f))
-                goto cull_fragment;
+            float xs = sas_current_position[0] - bv[0];
+            float ys = sas_current_position[1] - bv[1];
 
-            sas_current_buf_index = (current_sas_context->height - 1 - (unsigned)(sas_current_position[1] * current_sas_context->height)) * current_sas_context->width + (unsigned)(sas_current_position[0] * current_sas_context->width);
+            float s =  (xs * vec2[1] - ys * vec2[0]) * st_div;
+            float t = -(xs * vec1[1] - ys * vec1[0]) * st_div;
 
-            if (current_sas_context->__checkbuffer[sas_current_buf_index] == primitive_counter)
-                goto cull_fragment;
+            if ((s < 0.f) || (t < 0.f) || (s + t > 1.f))
+                continue;
 
-            current_sas_context->__checkbuffer[sas_current_buf_index] = primitive_counter;
+            sas_current_position[2] = bv[2] + s * vec1[2] + t * vec2[2];
+            sas_current_position[3] = bv[3] + s * vec1[3] + t * vec2[3];
+
+
+            if ((sas_current_position[2] < 0.f) || (sas_current_position[2] >= 1.f))
+                continue;
 
 
 #ifdef USE_ASSEMBLY
@@ -265,21 +252,6 @@ void sas_do_triangle(sas_color_t c1, float *t1, float *v1, int i1, sas_color_t c
             sas_calc_varyings(i1, i2, i3, w1, w2, w3, dd);
 
             sas_transform_fragment();
-
-
-cull_fragment:
-            if ((t + unit2 > 1.f - s) && !t_set_to_one)
-            {
-                t = 1.f - s - unit2;
-                t_set_to_one = true;
-            }
-        }
-
-
-        if ((s + unit1 > 1.f) && !s_set_to_one)
-        {
-            s = 1.f - unit1;
-            s_set_to_one = true;
         }
     }
 }
@@ -311,16 +283,6 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
         {
             sas_triangle_index = 0;
 
-            // On overflow: clear the buffer so we won't get pixels which seem
-            // to be already drawn but aren't.
-            if (!++primitive_counter)
-            {
-                memset(current_sas_context->__checkbuffer, 0, current_sas_context->width * current_sas_context->height);
-                // Set the counter to one, because all pixels in the buffer
-                // are now 0.
-                primitive_counter = 1;
-            }
-
             sas_do_triangle(sas_triangle_colors[0], sas_triangle_texcoords[0], sas_triangle_positions[0], 0,
                             sas_triangle_colors[1], sas_triangle_texcoords[1], sas_triangle_positions[1], 1,
                             sas_triangle_colors[2], sas_triangle_texcoords[2], sas_triangle_positions[2], 2);
@@ -340,12 +302,6 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
         {
             sas_quad_index = 0;
 
-            if (!++primitive_counter)
-            {
-                memset(current_sas_context->__checkbuffer, 0, current_sas_context->width * current_sas_context->height);
-                primitive_counter = 1;
-            }
-
             sas_do_triangle(sas_quad_colors[0], sas_quad_texcoords[0], sas_quad_positions[0], 0,
                             sas_quad_colors[1], sas_quad_texcoords[1], sas_quad_positions[1], 1,
                             sas_quad_colors[2], sas_quad_texcoords[2], sas_quad_positions[2], 2);
@@ -356,6 +312,34 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
 
             sas_flush_varyings();
+        }
+    }
+    else if (sas_current_mode == GL_QUAD_STRIP)
+    {
+        sas_quad_colors[sas_quad_index] = sas_current_color;
+        memcpy(sas_quad_texcoords[sas_quad_index], sas_multi_texcoord0, sizeof(sas_multi_texcoord0));
+        memcpy(sas_quad_positions[sas_quad_index++], sas_current_position, sizeof(sas_current_position));
+
+
+        if (sas_quad_index == 4)
+        {
+            sas_quad_index = 2;
+
+            sas_do_triangle(sas_quad_colors[0], sas_quad_texcoords[0], sas_quad_positions[0], 0,
+                            sas_quad_colors[1], sas_quad_texcoords[1], sas_quad_positions[1], 1,
+                            sas_quad_colors[2], sas_quad_texcoords[2], sas_quad_positions[2], 2);
+
+            sas_do_triangle(sas_quad_colors[2], sas_quad_texcoords[2], sas_quad_positions[2], 2,
+                            sas_quad_colors[3], sas_quad_texcoords[3], sas_quad_positions[3], 3,
+                            sas_quad_colors[0], sas_quad_texcoords[0], sas_quad_positions[0], 0);
+
+
+            sas_flush_varyings_partially(2);
+
+
+            memmove(&sas_quad_colors[0], &sas_quad_colors[2], sizeof(sas_quad_colors[0]) * 2);
+            memmove(&sas_quad_texcoords[0], &sas_quad_texcoords[2], sizeof(sas_quad_texcoords[0]) * 2);
+            memmove(&sas_quad_positions[0], &sas_quad_positions[2], sizeof(sas_quad_positions[2]) * 2);
         }
     }
 }

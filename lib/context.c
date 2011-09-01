@@ -32,9 +32,6 @@ sas_context_t create_sas_context(unsigned width, unsigned height)
     ctx->stencilbuffer = malloc(width * height * sizeof(SAS_STENCIL_TYPE));
 
 
-    ctx->__checkbuffer = malloc(width * height);
-
-
     return ctx;
 }
 
@@ -44,8 +41,6 @@ void destroy_sas_context(sas_context_t ctx)
     free(ctx->colorbuffer);
     free(ctx->depthbuffer);
     free(ctx->stencilbuffer);
-
-    free(ctx->__checkbuffer);
 
     free(ctx);
 }

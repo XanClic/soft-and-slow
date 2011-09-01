@@ -16,9 +16,10 @@
 #define GL_4_BYTES        0x1409
 #define GL_DOUBLE         0x140A
 
-#define GL_POINTS    0
-#define GL_TRIANGLES 4
-#define GL_QUADS     7
+#define GL_POINTS     0
+#define GL_TRIANGLES  4
+#define GL_QUADS      7
+#define GL_QUAD_STRIP 8
 
 #define GL_NO_ERROR          0x0000
 #define GL_INVALID_ENUM      0x0500
