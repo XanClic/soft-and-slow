@@ -720,6 +720,14 @@ void sas_flush_varyings(void)
     varying_index = 0;
 }
 
+void sas_flush_varyings_partially(size_t sz)
+{
+    varying_index -= sz;
+
+    for (struct program_varyings *pv = current_program->varyings; pv != NULL; pv = pv->next)
+        memmove(pv->saved_values, (void *)((uintptr_t)pv->saved_values + varying_index * varying_type_sizes[pv->type] * pv->size), sz * varying_type_sizes[pv->type] * pv->size);
+}
+
 void sas_push_varyings(void)
 {
     for (struct program_varyings *pv = current_program->varyings; pv != NULL; pv = pv->next)

@@ -16,6 +16,10 @@ void sas_push_varyings(void);
 // Resets the internal storage index.
 void sas_flush_varyings(void);
 
+// Subtracts sz from the internal storage index and moves the internal buffers
+// accordingly.
+void sas_flush_varyings_partially(size_t sz);
+
 // Calculate the varyings' values before entering the fragment shader; i1, i2
 // and i3 are the indizes to be used to look up the vertex values (three
 // vertices, because we always draw triangles); w1, w2 and w3 are their
