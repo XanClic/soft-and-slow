@@ -281,6 +281,9 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
         if (sas_triangle_index == 3)
         {
+            sas_color_t curcol = sas_current_color;
+
+
             sas_triangle_index = 0;
 
             sas_do_triangle(sas_triangle_colors[0], sas_triangle_texcoords[0], sas_triangle_positions[0], 0,
@@ -289,6 +292,9 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
 
             sas_flush_varyings();
+
+
+            sas_current_color = curcol;
         }
     }
     else if (sas_current_mode == GL_QUADS)
@@ -300,6 +306,9 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
         if (sas_quad_index == 4)
         {
+            sas_color_t curcol = sas_current_color;
+
+
             sas_quad_index = 0;
 
             sas_do_triangle(sas_quad_colors[0], sas_quad_texcoords[0], sas_quad_positions[0], 0,
@@ -312,6 +321,9 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
 
             sas_flush_varyings();
+
+
+            sas_current_color = curcol;
         }
     }
     else if (sas_current_mode == GL_QUAD_STRIP)
@@ -323,23 +335,27 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
         if (sas_quad_index == 4)
         {
+            sas_color_t curcol = sas_current_color;
+
+
             sas_quad_index = 2;
 
             sas_do_triangle(sas_quad_colors[0], sas_quad_texcoords[0], sas_quad_positions[0], 0,
                             sas_quad_colors[1], sas_quad_texcoords[1], sas_quad_positions[1], 1,
-                            sas_quad_colors[2], sas_quad_texcoords[2], sas_quad_positions[2], 2);
+                            sas_quad_colors[3], sas_quad_texcoords[3], sas_quad_positions[3], 3);
 
-            sas_do_triangle(sas_quad_colors[2], sas_quad_texcoords[2], sas_quad_positions[2], 2,
-                            sas_quad_colors[3], sas_quad_texcoords[3], sas_quad_positions[3], 3,
+            sas_do_triangle(sas_quad_colors[3], sas_quad_texcoords[3], sas_quad_positions[3], 3,
+                            sas_quad_colors[2], sas_quad_texcoords[2], sas_quad_positions[2], 2,
                             sas_quad_colors[0], sas_quad_texcoords[0], sas_quad_positions[0], 0);
-
 
             sas_flush_varyings_partially(2);
 
+            memcpy(&sas_quad_colors[0], &sas_quad_colors[2], sizeof(sas_quad_colors[0]) * 2);
+            memcpy(&sas_quad_texcoords[0], &sas_quad_texcoords[2], sizeof(sas_quad_texcoords[0]) * 2);
+            memcpy(&sas_quad_positions[0], &sas_quad_positions[2], sizeof(sas_quad_positions[0]) * 2);
 
-            memmove(&sas_quad_colors[0], &sas_quad_colors[2], sizeof(sas_quad_colors[0]) * 2);
-            memmove(&sas_quad_texcoords[0], &sas_quad_texcoords[2], sizeof(sas_quad_texcoords[0]) * 2);
-            memmove(&sas_quad_positions[0], &sas_quad_positions[2], sizeof(sas_quad_positions[2]) * 2);
+
+            sas_current_color = curcol;
         }
     }
 }
