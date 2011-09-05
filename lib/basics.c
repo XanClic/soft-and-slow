@@ -7,6 +7,8 @@
 #include <soft-and-slow/context.h>
 #include <soft-and-slow/gl.h>
 #include <soft-and-slow/helpers.h>
+#include <soft-and-slow/light.h>
+#include <soft-and-slow/limits.h>
 #include <soft-and-slow/matrix.h>
 #include <soft-and-slow/types.h>
 
@@ -26,6 +28,13 @@ extern bool (*sas_alpha_func)(float new, float ref);
 
 extern bool sas_do_cw_culling, sas_do_ccw_culling;
 extern GLenum sas_cull_face, sas_front_face;
+
+extern bool sas_normalize_normals;
+
+extern sas_light_t sas_lights[SAS_LIGHTS];
+
+
+extern void sas_load_fixed_pipeline(bool lighting);
 
 
 void glClearColor(GLclampf r, GLclampf g, GLclampf b, GLclampf a)
@@ -122,6 +131,15 @@ void glEnable(GLenum cap)
         case GL_TEXTURE_2D:
             sas_2d_textures_enabled = true;
             break;
+        case GL_LIGHTING:
+            sas_load_fixed_pipeline(true);
+            break;
+        case GL_LIGHT0:
+            sas_lights[0].enabled = true;
+            break;
+        case GL_NORMALIZE:
+            sas_normalize_normals = true;
+            break;
         default:
             sas_error = GL_INVALID_ENUM;
     }
@@ -143,6 +161,15 @@ void glDisable(GLenum cap)
         case GL_TEXTURE_2D:
             sas_2d_textures_enabled = false;
             break;
+        case GL_LIGHTING:
+            sas_load_fixed_pipeline(false);
+            break;
+        case GL_LIGHT0:
+            sas_lights[0].enabled = false;
+            break;
+        case GL_NORMALIZE:
+            sas_normalize_normals = false;
+            break;
         default:
             sas_error = GL_INVALID_ENUM;
     }
@@ -160,6 +187,10 @@ GLboolean glIsEnabled(GLenum cap)
             return sas_do_depth_test;
         case GL_TEXTURE_2D:
             return sas_2d_textures_enabled;
+        case GL_LIGHT0:
+            return sas_lights[0].enabled;
+        case GL_NORMALIZE:
+            return sas_normalize_normals;
         default:
             sas_error = GL_INVALID_ENUM;
     }

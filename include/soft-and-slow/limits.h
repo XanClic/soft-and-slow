@@ -17,4 +17,7 @@
 // Number of uniforms per program
 #define SAS_MAX_UNIFORMS 32
 
+// Number of lights
+#define SAS_LIGHTS 8
+
 #endif

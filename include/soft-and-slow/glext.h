@@ -12,6 +12,7 @@ extern "C" {
 GLuint glCreateProgram(void);
 void glLinkProgram(GLuint id);
 void glUseProgram(GLuint id);
+void glDeleteProgram(GLuint id);
 
 GLuint glCreateShader(GLenum type);
 void glShaderSource(GLuint id, GLsizei count, const GLchar **string, const GLint *length);

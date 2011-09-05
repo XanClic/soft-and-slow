@@ -248,12 +248,16 @@ int main(void)
 
     GLint off_pos = glGetUniformLocation(prog, "offset");
 
+    float xrot = 0.f, yrot = 0.f;
+
+#ifndef SAS
+    int last_x = 320, last_y = 240;
+#endif
+
     while (!quit)
     {
         float ft = frame_time();
 
-
-        glRotatef(ft * 20.f, -1.f, .34f, .6f);
 
         glUniform1f(off_pos, offset);
         offset += ft * 100.f;
@@ -283,14 +287,69 @@ int main(void)
         SDL_Event evt;
 
         while (SDL_PollEvent(&evt))
+        {
             if (evt.type == SDL_QUIT)
                 quit = true;
+            if (evt.type == SDL_MOUSEMOTION)
+            {
+                SDL_MouseMotionEvent mmevt = evt.motion;
+
+                xrot += mmevt.yrel;
+                yrot += mmevt.xrel;
+
+                while (xrot < 0.f)
+                    xrot += 360.f;
+                while (yrot < 0.f)
+                    yrot += 360.f;
+                while (xrot >= 360.f)
+                    xrot -= 360.f;
+                while (yrot >= 360.f)
+                    yrot -= 360.f;
+
+
+                glLoadIdentity();
+
+                glTranslatef(0.f, 0.f, -4.f);
+
+                glRotatef(xrot, 1.f, 0.f, 0.f);
+                glRotatef(yrot, 0.f, 1.f, 0.f);
+            }
+        }
 #else
         sf::Event evt;
 
         while (wnd.PollEvent(evt))
+        {
             if (evt.Type == sf::Event::Closed)
                 quit = true;
+            else if (evt.Type == sf::Event::MouseMoved)
+            {
+                sf::Event::MouseMoveEvent mmevt = evt.MouseMove;
+
+                xrot += mmevt.Y - last_y;
+                yrot += mmevt.X - last_x;
+
+                last_x = mmevt.X;
+                last_y = mmevt.Y;
+
+                while (xrot < 0.f)
+                    xrot += 360.f;
+                while (yrot < 0.f)
+                    yrot += 360.f;
+                while (xrot >= 360.f)
+                    xrot -= 360.f;
+                while (yrot >= 360.f)
+                    yrot -= 360.f;
+
+
+                glLoadIdentity();
+
+                glTranslatef(0.f, 0.f, -4.f);
+
+                glRotatef(xrot, 1.f, 0.f, 0.f);
+                glRotatef(yrot, 0.f, 1.f, 0.f);
+            }
+        }
 #endif
 
 

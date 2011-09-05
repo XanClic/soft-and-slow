@@ -133,5 +133,16 @@
 #define GL_LINK_STATUS     0x8B82
 #define GL_INFO_LOG_LENGTH 0x8B84
 
+#define GL_LIGHTING            0x0B50
+#define GL_LIGHT0              0x4000
+#define GL_AMBIENT             0x1200
+#define GL_DIFFUSE             0x1201
+#define GL_SPECULAR            0x1202
+#define GL_SHININESS           0x1601
+#define GL_EMISSION            0x1600
+#define GL_POSITION            0x1203
+#define GL_AMBIENT_AND_DIFFUSE 0x1602
+#define GL_NORMALIZE           0x0BA1
+
 
 #endif
