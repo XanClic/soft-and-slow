@@ -19,6 +19,7 @@ extern GLenum sas_current_mode;
 
 extern sas_color_t sas_current_color;
 extern float sas_multi_texcoord0[4], sas_current_vertex[4];
+extern float sas_current_normal[3];
 
 extern float sas_current_position[4], sas_triangle_positions[3][4];
 extern float sas_triangle_texcoords[3][4], sas_current_texcoord[8][4];
@@ -30,6 +31,7 @@ extern sas_color_t sas_quad_colors[4];
 extern int sas_triangle_index, sas_quad_index;
 
 extern bool sas_do_cw_culling, sas_do_ccw_culling;
+extern bool sas_normalize_normals;
 
 extern unsigned sas_current_buf_index;
 
@@ -82,6 +84,24 @@ void glTexCoord2f(GLfloat s, GLfloat v)
     sas_multi_texcoord0[1] = v;
     sas_multi_texcoord0[2] = 0.f;
     sas_multi_texcoord0[3] = 1.f;
+}
+
+void glNormal3f(GLfloat x, GLfloat y, GLfloat z)
+{
+    if (!sas_normalize_normals)
+    {
+        sas_current_normal[0] = x;
+        sas_current_normal[1] = y;
+        sas_current_normal[2] = z;
+    }
+    else
+    {
+        float fac = 1.f / sqrtf(x * x + y * y + z * z);
+
+        sas_current_normal[0] = x * fac;
+        sas_current_normal[1] = y * fac;
+        sas_current_normal[2] = z * fac;
+    }
 }
 
 

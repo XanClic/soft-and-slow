@@ -266,6 +266,7 @@ void glCompileShader(GLuint id)
     while (v != NULL)
     {
         struct shader_varyings *vn = v->next;
+        free(v->identifier);
         free(v);
         v = vn;
     }
@@ -452,6 +453,7 @@ void glLinkProgram(GLuint id)
         while (v != NULL)
         {
             struct program_varyings *vn = v->next;
+            free(v->saved_values);
             free(v);
             v = vn;
         }
@@ -531,6 +533,26 @@ void glLinkProgram(GLuint id)
     }
 }
 
+static void sas_delete_shader(struct sas_shader *s)
+{
+    if (!--s->refcount)
+    {
+        struct shader_varyings *v = s->varyings;
+        while (v != NULL)
+        {
+            struct shader_varyings *vn = v->next;
+            free(v->identifier);
+            free(v);
+            v = vn;
+        }
+
+        free(s->source);
+        free(s->compiled);
+        free(s->log);
+        free(s);
+    }
+}
+
 void glDeleteShader(GLuint id)
 {
     if (shaders[id] == NULL)
@@ -539,16 +561,48 @@ void glDeleteShader(GLuint id)
         return;
     }
 
+    sas_delete_shader(shaders[id]);
 
-    if (!--shaders[id]->refcount)
+    shaders[id] = NULL;
+}
+
+
+void glDeleteProgram(GLuint id)
+{
+    if (programs[id] == NULL)
     {
-        free(shaders[id]->source);
-        free(shaders[id]->compiled);
-        free(shaders[id]->log);
-        free(shaders[id]);
-
-        shaders[id] = NULL;
+        sas_error = GL_INVALID_VALUE;
+        return;
     }
+
+
+    struct sas_shader_list *sl = programs[id]->shaders;
+    while (sl != NULL)
+    {
+        sas_delete_shader(sl->shader);
+
+        struct sas_shader_list *n = sl->next;
+        free(sl);
+        sl = n;
+    }
+
+
+    dlclose(programs[id]->dl);
+
+
+    struct program_varyings *pv = programs[id]->varyings;
+    while (pv != NULL)
+    {
+        struct program_varyings *pvn = pv->next;
+        free(pv->saved_values);
+        free(pv);
+        pv = pvn;
+    }
+
+
+    free(programs[id]);
+
+    programs[id] = NULL;
 }
 
 

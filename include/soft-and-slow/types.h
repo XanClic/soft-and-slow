@@ -107,4 +107,7 @@ struct sas_xmm
     };
 } cc_packed;
 
+
+#include "light.h"
+
 #endif

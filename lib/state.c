@@ -3,6 +3,7 @@
 
 #include <soft-and-slow/constants.h>
 #include <soft-and-slow/context.h>
+#include <soft-and-slow/light.h>
 #include <soft-and-slow/limits.h>
 #include <soft-and-slow/matrix.h>
 #include <soft-and-slow/types.h>
@@ -50,6 +51,8 @@ int sas_current_mode = -1;
 
 sas_color_t sas_current_color = { .r = 1.f, .g = 1.f, .b = 1.f, .a = 1.f };
 
+float sas_current_normal[3];
+
 
 bool sas_do_depth_test = false, sas_do_alpha_test = false;
 // Cull clockwise or counter-clockwise faces, respectively
@@ -85,3 +88,69 @@ bool sas_2d_textures_enabled;
 
 sas_texture_2d_t *sas_textures_2d[SAS_TEXTURES];
 GLuint sas_texture_units_2d[SAS_TEX_UNITS];
+
+
+
+// All are disabled per default, which is how "enabled" is statically
+// initialized (to false).
+sas_light_t sas_lights[SAS_LIGHTS] = {
+    [0] = {
+        .position = { 0.f, 0.f, 1.f, 0.f },
+        .ambient  = { 0.f, 0.f, 0.f, 1.f },
+        .diffuse  = { 1.f, 1.f, 1.f, 1.f },
+        .specular = { 1.f, 1.f, 1.f, 1.f }
+    },
+    [1] = {
+        .position = { 0.f, 0.f, 1.f, 0.f },
+        .ambient  = { 0.f, 0.f, 0.f, 1.f },
+        .diffuse  = { 0.f, 0.f, 0.f, 1.f },
+        .specular = { 0.f, 0.f, 0.f, 1.f }
+    },
+    [2] = {
+        .position = { 0.f, 0.f, 1.f, 0.f },
+        .ambient  = { 0.f, 0.f, 0.f, 1.f },
+        .diffuse  = { 0.f, 0.f, 0.f, 1.f },
+        .specular = { 0.f, 0.f, 0.f, 1.f }
+    },
+    [3] = {
+        .position = { 0.f, 0.f, 1.f, 0.f },
+        .ambient  = { 0.f, 0.f, 0.f, 1.f },
+        .diffuse  = { 0.f, 0.f, 0.f, 1.f },
+        .specular = { 0.f, 0.f, 0.f, 1.f }
+    },
+    [4] = {
+        .position = { 0.f, 0.f, 1.f, 0.f },
+        .ambient  = { 0.f, 0.f, 0.f, 1.f },
+        .diffuse  = { 0.f, 0.f, 0.f, 1.f },
+        .specular = { 0.f, 0.f, 0.f, 1.f }
+    },
+    [5] = {
+        .position = { 0.f, 0.f, 1.f, 0.f },
+        .ambient  = { 0.f, 0.f, 0.f, 1.f },
+        .diffuse  = { 0.f, 0.f, 0.f, 1.f },
+        .specular = { 0.f, 0.f, 0.f, 1.f }
+    },
+    [6] = {
+        .position = { 0.f, 0.f, 1.f, 0.f },
+        .ambient  = { 0.f, 0.f, 0.f, 1.f },
+        .diffuse  = { 0.f, 0.f, 0.f, 1.f },
+        .specular = { 0.f, 0.f, 0.f, 1.f }
+    },
+    [7] = {
+        .position = { 0.f, 0.f, 1.f, 0.f },
+        .ambient  = { 0.f, 0.f, 0.f, 1.f },
+        .diffuse  = { 0.f, 0.f, 0.f, 1.f },
+        .specular = { 0.f, 0.f, 0.f, 1.f }
+    }
+};
+
+sas_material_t sas_current_material = {
+    .ambient  = { .2f, .2f, .2f, 1.f },
+    .diffuse  = { .8f, .8f, .8f, 1.f },
+    .specular = { 0.f, 0.f, 0.f, 1.f },
+    .emission = { 0.f, 0.f, 0.f, 1.f },
+
+    .shininess = 0.f
+};
+
+bool sas_normalize_normals = false;

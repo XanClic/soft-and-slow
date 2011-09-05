@@ -119,6 +119,7 @@ class vec4
         vec4 operator/(float v) { return vec4(x / v, y / v, z / v, w / v); }
         vec4 operator+(const vec4 &v) { return vec4(x + v.x, y + v.y, z + v.z, w + v.w); }
         vec4 operator-(const vec4 &v) { return vec4(x - v.x, y - v.y, z - v.z, w - v.w); }
+        void operator+=(const vec4 &v) { x += v.x; y += v.y; z += v.z; w += v.w; }
 
         union
         {
@@ -255,6 +256,11 @@ static inline vec4 normalize(vec4 vec)
     float len = sqrtf(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z + vec.w * vec.w);
     return vec / len;
 }
+
+template <typename T> static inline float length(T vec);
+static inline float length(vec2 vec) { return sqrtf(vec.x * vec.x + vec.y * vec.y); }
+static inline float length(vec3 vec) { return sqrtf(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z); }
+static inline float length(vec4 vec) { return sqrtf(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z + vec.w * vec.w); }
 
 
 template<typename T> static inline float dot(T x, T y);

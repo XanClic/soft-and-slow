@@ -13,7 +13,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-    
+
 
 #include "types.h"
 
@@ -64,6 +64,11 @@ void glBindTexture(GLenum target, GLuint id);
 void glGenTextures(GLsizei n, GLuint *textures);
 void glTexImage2D(GLenum target, GLint level, GLint internal_format, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const GLvoid *data);
 void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *data);
+
+void glLightfv(GLenum light, GLenum pname, const GLfloat *params);
+void glMaterialf(GLenum face, GLenum pname, const GLfloat param);
+void glMaterialfv(GLenum face, GLenum pname, const GLfloat *params);
+void glNormal3f(GLfloat x, GLfloat y, GLfloat z);
 
 
 #ifdef __cplusplus
