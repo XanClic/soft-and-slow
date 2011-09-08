@@ -8,6 +8,7 @@
 #include <soft-and-slow/constants.h>
 #include <soft-and-slow/gl.h>
 #include <soft-and-slow/glext.h>
+#include <soft-and-slow/threads.h>
 
 
 extern char _binary_fixed_vertex_transformation_glsl_start[];
@@ -126,4 +127,9 @@ void sas_init(void)
 
 
     glActiveTexture(GL_TEXTURE0);
+
+
+#ifdef THREADING
+    sas_spawn_threads();
+#endif
 }
