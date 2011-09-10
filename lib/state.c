@@ -155,3 +155,8 @@ sas_material_t sas_current_material = {
 };
 
 bool sas_normalize_normals = false;
+
+
+sas_command_list_t **sas_current_command_list;
+// Execute current command list (while expanding)
+bool sas_execute_ccl;
