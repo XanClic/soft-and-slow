@@ -23,6 +23,7 @@ extern GLenum sas_error;
 extern SAS_MATRIX_TYPE sas_modelview[16], sas_projection[16];
 
 extern bool sas_do_depth_test, sas_do_alpha_test, sas_2d_textures_enabled;
+extern bool sas_smooth_shading;
 extern bool (*sas_depth_func)(float new, float current);
 extern bool (*sas_alpha_func)(float new, float ref);
 
@@ -209,7 +210,7 @@ GLenum glGetError(void)
 }
 
 
-GLvoid glCullFace(GLenum mode)
+void glCullFace(GLenum mode)
 {
     if ((mode != GL_BACK) && (mode != GL_FRONT) && (mode != GL_FRONT_AND_BACK))
     {
@@ -225,7 +226,7 @@ GLvoid glCullFace(GLenum mode)
         glEnable(GL_CULL_FACE);
 }
 
-GLvoid glFrontFace(GLenum mode)
+void glFrontFace(GLenum mode)
 {
     if ((mode != GL_CCW) && (mode != GL_CW))
     {
@@ -239,4 +240,16 @@ GLvoid glFrontFace(GLenum mode)
     // Reset modes
     if (glIsEnabled(GL_CULL_FACE))
         glEnable(GL_CULL_FACE);
+}
+
+void glShadeModel(GLenum mode)
+{
+    if ((mode != GL_FLAT) && (mode != GL_SMOOTH))
+    {
+        sas_error = GL_INVALID_ENUM;
+        return;
+    }
+
+
+    sas_smooth_shading = (mode == GL_SMOOTH);
 }

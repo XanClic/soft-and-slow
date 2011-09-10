@@ -58,6 +58,7 @@ bool sas_do_depth_test = false, sas_do_alpha_test = false;
 // Cull clockwise or counter-clockwise faces, respectively
 bool sas_do_cw_culling = false, sas_do_ccw_culling = false;
 GLenum sas_cull_face = GL_BACK, sas_front_face = GL_CCW;
+bool sas_smooth_shading = true;
 
 float sas_alpha_ref;
 

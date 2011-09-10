@@ -74,6 +74,8 @@ gear(GLfloat inner_radius, GLfloat outer_radius, GLfloat width,
 
   da = 2.0 * M_PI / teeth / 4.0;
 
+  glShadeModel(GL_FLAT);
+
   glNormal3f(0.0, 0.0, 1.0);
 
   /* draw front face */
@@ -160,6 +162,8 @@ gear(GLfloat inner_radius, GLfloat outer_radius, GLfloat width,
   glVertex3f(r1 * cos(0), r1 * sin(0), -width * 0.5);
 
   glEnd();
+
+  glShadeModel(GL_SMOOTH);
 
   /* draw inside radius cylinder */
   glBegin(GL_QUAD_STRIP);

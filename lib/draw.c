@@ -33,6 +33,7 @@ extern int sas_triangle_index, sas_quad_index;
 
 extern bool sas_do_cw_culling, sas_do_ccw_culling;
 extern bool sas_normalize_normals;
+extern bool sas_smooth_shading;
 
 extern unsigned sas_current_buf_index;
 
@@ -146,6 +147,7 @@ void sas_do_triangle(void *dti_voidptr)
             return;
     }
 
+
     float d1 = .5f - dti->vertex_positions[0][2] * .5f;
     float d2 = .5f - dti->vertex_positions[1][2] * .5f;
     float d3 = .5f - dti->vertex_positions[2][2] * .5f;
@@ -201,50 +203,87 @@ void sas_do_triangle(void *dti_voidptr)
 #ifdef USE_ASSEMBLY
             float w1, w2, w3, dd;
 
-            __asm__ __volatile__ ("pshufd   xmm13,%6,0x00;" // w2 = s
-                                  "pshufd   xmm14,%7,0x00;" // w3 = t
-                                  "movaps   xmm12,[%8];"
-                                  "subps    xmm12,xmm13;"
-                                  "subps    xmm12,xmm14;"   // w1 = 1 - s - t
-                                  "pshufd   xmm0,%9,0x00;"
-                                  "mulps    xmm12,xmm0;"    // w1 *= d1
-                                  "pshufd   xmm0,%10,0x00;"
-                                  "mulps    xmm13,xmm0;"    // w2 *= d2
-                                  "pshufd   xmm0,%11,0x00;"
-                                  "mulps    xmm14,xmm0;"    // w3 *= d3
-                                  "movaps   xmm15,xmm12;"
-                                  "addps    xmm15,xmm13;"
-                                  "addps    xmm15,xmm14;"
-                                  "rcpps    xmm15,xmm15;"   // dd = 1 / (w1 + w2 + w3)
-                                  "movss    %0,xmm12;"
-                                  "movss    %1,xmm13;"
-                                  "movss    %2,xmm14;"
-                                  "movss    %3,xmm15;"
+            if (sas_smooth_shading)
+            {
+                __asm__ __volatile__ ("pshufd   xmm13,%6,0x00;" // w2 = s
+                                      "pshufd   xmm14,%7,0x00;" // w3 = t
+                                      "movaps   xmm12,[%8];"
+                                      "subps    xmm12,xmm13;"
+                                      "subps    xmm12,xmm14;"   // w1 = 1 - s - t
+                                      "pshufd   xmm0,%9,0x00;"
+                                      "mulps    xmm12,xmm0;"    // w1 *= d1
+                                      "pshufd   xmm0,%10,0x00;"
+                                      "mulps    xmm13,xmm0;"    // w2 *= d2
+                                      "pshufd   xmm0,%11,0x00;"
+                                      "mulps    xmm14,xmm0;"    // w3 *= d3
+                                      "movaps   xmm15,xmm12;"
+                                      "addps    xmm15,xmm13;"
+                                      "addps    xmm15,xmm14;"
+                                      "rcpps    xmm15,xmm15;"   // dd = 1 / (w1 + w2 + w3)
+                                      "movss    %0,xmm12;"
+                                      "movss    %1,xmm13;"
+                                      "movss    %2,xmm14;"
+                                      "movss    %3,xmm15;"
 
-                                  "movaps   xmm0,%12;"
-                                  "mulps    xmm0,xmm12;"
-                                  "movaps   xmm1,%13;"
-                                  "mulps    xmm1,xmm13;"
-                                  "addps    xmm0,xmm1;"
-                                  "movaps   xmm1,%14;"
-                                  "mulps    xmm1,xmm14;"
-                                  "addps    xmm0,xmm1;"
-                                  "mulps    xmm0,xmm15;"
-                                  "movaps   %4,xmm0;"
+                                      "movaps   xmm0,%12;"
+                                      "mulps    xmm0,xmm12;"
+                                      "movaps   xmm1,%13;"
+                                      "mulps    xmm1,xmm13;"
+                                      "addps    xmm0,xmm1;"
+                                      "movaps   xmm1,%14;"
+                                      "mulps    xmm1,xmm14;"
+                                      "addps    xmm0,xmm1;"
+                                      "mulps    xmm0,xmm15;"
+                                      "movaps   %4,xmm0;"
 
-                                  "mulps    xmm12,%15;"
-                                  "mulps    xmm13,%16;"
-                                  "mulps    xmm14,%17;"
-                                  "addps    xmm12,xmm13;"
-                                  "addps    xmm12,xmm14;"
-                                  "mulps    xmm12,xmm15;"
-                                  "movaps   %5,xmm12"
-                                  : "=x"(w1), "=x"(w2), "=x"(w3), "=x"(dd), "=m"(dti->current_color), "=m"(dti->current_texcoord[0])
-                                  : "x"(s), "x"(t), "r"(xmm_one),
-                                    "x"(d1), "x"(d2), "x"(d3),
-                                    "m"(dti->vertex_colors[0]), "m"(dti->vertex_colors[1]), "m"(dti->vertex_colors[2]),
-                                    "m"(*(sas_xmm_t *)dti->vertex_texcoords[0]), "m"(*(sas_xmm_t *)dti->vertex_texcoords[1]), "m"(*(sas_xmm_t *)dti->vertex_texcoords[2])
-                                  : "xmm0", "xmm1", "xmm12", "xmm13", "xmm14", "xmm15");
+                                      "mulps    xmm12,%15;"
+                                      "mulps    xmm13,%16;"
+                                      "mulps    xmm14,%17;"
+                                      "addps    xmm12,xmm13;"
+                                      "addps    xmm12,xmm14;"
+                                      "mulps    xmm12,xmm15;"
+                                      "movaps   %5,xmm12"
+                                      : "=x"(w1), "=x"(w2), "=x"(w3), "=x"(dd), "=m"(dti->current_color), "=m"(dti->current_texcoord[0])
+                                      : "x"(s), "x"(t), "r"(xmm_one),
+                                        "x"(d1), "x"(d2), "x"(d3),
+                                        "m"(dti->vertex_colors[0]), "m"(dti->vertex_colors[1]), "m"(dti->vertex_colors[2]),
+                                        "m"(*(sas_xmm_t *)dti->vertex_texcoords[0]), "m"(*(sas_xmm_t *)dti->vertex_texcoords[1]), "m"(*(sas_xmm_t *)dti->vertex_texcoords[2])
+                                      : "xmm0", "xmm1", "xmm12", "xmm13", "xmm14", "xmm15");
+            }
+            else
+            {
+                __asm__ __volatile__ ("pshufd   xmm13,%5,0x00;" // w2 = s
+                                      "pshufd   xmm14,%6,0x00;" // w3 = t
+                                      "movaps   xmm12,[%7];"
+                                      "subps    xmm12,xmm13;"
+                                      "subps    xmm12,xmm14;"   // w1 = 1 - s - t
+                                      "pshufd   xmm0,%8,0x00;"
+                                      "mulps    xmm12,xmm0;"    // w1 *= d1
+                                      "pshufd   xmm0,%9,0x00;"
+                                      "mulps    xmm13,xmm0;"    // w2 *= d2
+                                      "pshufd   xmm0,%10,0x00;"
+                                      "mulps    xmm14,xmm0;"    // w3 *= d3
+                                      "movaps   xmm15,xmm12;"
+                                      "addps    xmm15,xmm13;"
+                                      "addps    xmm15,xmm14;"
+                                      "rcpps    xmm15,xmm15;"   // dd = 1 / (w1 + w2 + w3)
+                                      "movss    %0,xmm12;"
+                                      "movss    %1,xmm13;"
+                                      "movss    %2,xmm14;"
+                                      "movss    %3,xmm15;"
+
+                                      "mulps    xmm12,%11;"
+                                      "mulps    xmm13,%12;"
+                                      "mulps    xmm14,%13;"
+                                      "addps    xmm12,xmm13;"
+                                      "addps    xmm12,xmm14;"
+                                      "mulps    xmm12,xmm15;"
+                                      "movaps   %4,xmm12"
+                                      : "=x"(w1), "=x"(w2), "=x"(w3), "=x"(dd), "=m"(dti->current_texcoord[0])
+                                      : "x"(s), "x"(t), "r"(xmm_one), "x"(d1), "x"(d2), "x"(d3),
+                                        "m"(*(sas_xmm_t *)dti->vertex_texcoords[0]), "m"(*(sas_xmm_t *)dti->vertex_texcoords[1]), "m"(*(sas_xmm_t *)dti->vertex_texcoords[2])
+                                      : "xmm0", "xmm12", "xmm13", "xmm14", "xmm15");
+            }
 #else
             // Get weighting
             float w1 = 1.f - s - t, w2 = s, w3 = t;
@@ -257,10 +296,13 @@ void sas_do_triangle(void *dti_voidptr)
             // Depth multiplier for perspective correct mapping
             float dd = 1.f / (w1 + w2 + w3);
 
-            dti->current_color.r = (dti->vertex_colors[0].r * w1 + dti->vertex_colors[1].r * w2 + dti->vertex_colors[2].r * w3) * dd;
-            dti->current_color.g = (dti->vertex_colors[0].g * w1 + dti->vertex_colors[1].g * w2 + dti->vertex_colors[2].g * w3) * dd;
-            dti->current_color.b = (dti->vertex_colors[0].b * w1 + dti->vertex_colors[1].b * w2 + dti->vertex_colors[2].b * w3) * dd;
-            dti->current_color.a = (dti->vertex_colors[0].a * w1 + dti->vertex_colors[1].a * w2 + dti->vertex_colors[2].a * w3) * dd;
+            if (sas_smooth_shading)
+            {
+                dti->current_color.r = (dti->vertex_colors[0].r * w1 + dti->vertex_colors[1].r * w2 + dti->vertex_colors[2].r * w3) * dd;
+                dti->current_color.g = (dti->vertex_colors[0].g * w1 + dti->vertex_colors[1].g * w2 + dti->vertex_colors[2].g * w3) * dd;
+                dti->current_color.b = (dti->vertex_colors[0].b * w1 + dti->vertex_colors[1].b * w2 + dti->vertex_colors[2].b * w3) * dd;
+                dti->current_color.a = (dti->vertex_colors[0].a * w1 + dti->vertex_colors[1].a * w2 + dti->vertex_colors[2].a * w3) * dd;
+            }
 
             // TODO: Which texture unit to use
             dti->current_texcoord[0][0] = (dti->vertex_texcoords[0][0] * w1 + dti->vertex_texcoords[1][0] * w2 + dti->vertex_texcoords[2][0] * w3) * dd;
@@ -372,47 +414,83 @@ void sas_do_triangle(sas_color_t c1, float *t1, float *v1, int i1, sas_color_t c
 #ifdef USE_ASSEMBLY
             float w1, w2, w3, dd;
 
-            __asm__ __volatile__ ("pshufd   xmm13,%6,0x00;" // w2 = s
-                                  "pshufd   xmm14,%7,0x00;" // w3 = t
-                                  "movaps   xmm12,[%8];"
-                                  "subps    xmm12,xmm13;"
-                                  "subps    xmm12,xmm14;"   // w1 = 1 - s - t
-                                  "pshufd   xmm0,%9,0x00;"
-                                  "mulps    xmm12,xmm0;"    // w1 *= d1
-                                  "pshufd   xmm0,%10,0x00;"
-                                  "mulps    xmm13,xmm0;"    // w2 *= d2
-                                  "pshufd   xmm0,%11,0x00;"
-                                  "mulps    xmm14,xmm0;"    // w3 *= d3
-                                  "movaps   xmm15,xmm12;"
-                                  "addps    xmm15,xmm13;"
-                                  "addps    xmm15,xmm14;"
-                                  "rcpps    xmm15,xmm15;"   // dd = 1 / (w1 + w2 + w3)
-                                  "movss    %0,xmm12;"
-                                  "movss    %1,xmm13;"
-                                  "movss    %2,xmm14;"
-                                  "movss    %3,xmm15;"
+            if (sas_smooth_shading)
+            {
+                __asm__ __volatile__ ("pshufd   xmm13,%6,0x00;" // w2 = s
+                                      "pshufd   xmm14,%7,0x00;" // w3 = t
+                                      "movaps   xmm12,[%8];"
+                                      "subps    xmm12,xmm13;"
+                                      "subps    xmm12,xmm14;"   // w1 = 1 - s - t
+                                      "pshufd   xmm0,%9,0x00;"
+                                      "mulps    xmm12,xmm0;"    // w1 *= d1
+                                      "pshufd   xmm0,%10,0x00;"
+                                      "mulps    xmm13,xmm0;"    // w2 *= d2
+                                      "pshufd   xmm0,%11,0x00;"
+                                      "mulps    xmm14,xmm0;"    // w3 *= d3
+                                      "movaps   xmm15,xmm12;"
+                                      "addps    xmm15,xmm13;"
+                                      "addps    xmm15,xmm14;"
+                                      "rcpps    xmm15,xmm15;"   // dd = 1 / (w1 + w2 + w3)
+                                      "movss    %0,xmm12;"
+                                      "movss    %1,xmm13;"
+                                      "movss    %2,xmm14;"
+                                      "movss    %3,xmm15;"
 
-                                  "movaps   xmm0,%12;"
-                                  "mulps    xmm0,xmm12;"
-                                  "movaps   xmm1,%13;"
-                                  "mulps    xmm1,xmm13;"
-                                  "addps    xmm0,xmm1;"
-                                  "movaps   xmm1,%14;"
-                                  "mulps    xmm1,xmm14;"
-                                  "addps    xmm0,xmm1;"
-                                  "mulps    xmm0,xmm15;"
-                                  "movaps   %4,xmm0;"
+                                      "movaps   xmm0,%12;"
+                                      "mulps    xmm0,xmm12;"
+                                      "movaps   xmm1,%13;"
+                                      "mulps    xmm1,xmm13;"
+                                      "addps    xmm0,xmm1;"
+                                      "movaps   xmm1,%14;"
+                                      "mulps    xmm1,xmm14;"
+                                      "addps    xmm0,xmm1;"
+                                      "mulps    xmm0,xmm15;"
+                                      "movaps   %4,xmm0;"
 
-                                  "mulps    xmm12,%15;"
-                                  "mulps    xmm13,%16;"
-                                  "mulps    xmm14,%17;"
-                                  "addps    xmm12,xmm13;"
-                                  "addps    xmm12,xmm14;"
-                                  "mulps    xmm12,xmm15;"
-                                  "movaps   %5,xmm12"
-                                  : "=x"(w1), "=x"(w2), "=x"(w3), "=x"(dd), "=m"(sas_current_color), "=m"(sas_current_texcoord[0])
-                                  : "x"(s), "x"(t), "r"(xmm_one), "x"(d1), "x"(d2), "x"(d3), "m"(c1), "m"(c2), "m"(c3), "m"(*(sas_xmm_t *)t1), "m"(*(sas_xmm_t *)t2), "m"(*(sas_xmm_t *)t3)
-                                  : "xmm0", "xmm1", "xmm12", "xmm13", "xmm14", "xmm15");
+                                      "mulps    xmm12,%15;"
+                                      "mulps    xmm13,%16;"
+                                      "mulps    xmm14,%17;"
+                                      "addps    xmm12,xmm13;"
+                                      "addps    xmm12,xmm14;"
+                                      "mulps    xmm12,xmm15;"
+                                      "movaps   %5,xmm12"
+                                      : "=x"(w1), "=x"(w2), "=x"(w3), "=x"(dd), "=m"(sas_current_color), "=m"(sas_current_texcoord[0])
+                                      : "x"(s), "x"(t), "r"(xmm_one), "x"(d1), "x"(d2), "x"(d3), "m"(c1), "m"(c2), "m"(c3), "m"(*(sas_xmm_t *)t1), "m"(*(sas_xmm_t *)t2), "m"(*(sas_xmm_t *)t3)
+                                      : "xmm0", "xmm1", "xmm12", "xmm13", "xmm14", "xmm15");
+            }
+            else
+            {
+                __asm__ __volatile__ ("pshufd   xmm13,%5,0x00;" // w2 = s
+                                      "pshufd   xmm14,%6,0x00;" // w3 = t
+                                      "movaps   xmm12,[%7];"
+                                      "subps    xmm12,xmm13;"
+                                      "subps    xmm12,xmm14;"   // w1 = 1 - s - t
+                                      "pshufd   xmm0,%8,0x00;"
+                                      "mulps    xmm12,xmm0;"    // w1 *= d1
+                                      "pshufd   xmm0,%9,0x00;"
+                                      "mulps    xmm13,xmm0;"    // w2 *= d2
+                                      "pshufd   xmm0,%10,0x00;"
+                                      "mulps    xmm14,xmm0;"    // w3 *= d3
+                                      "movaps   xmm15,xmm12;"
+                                      "addps    xmm15,xmm13;"
+                                      "addps    xmm15,xmm14;"
+                                      "rcpps    xmm15,xmm15;"   // dd = 1 / (w1 + w2 + w3)
+                                      "movss    %0,xmm12;"
+                                      "movss    %1,xmm13;"
+                                      "movss    %2,xmm14;"
+                                      "movss    %3,xmm15;"
+
+                                      "mulps    xmm12,%11;"
+                                      "mulps    xmm13,%12;"
+                                      "mulps    xmm14,%13;"
+                                      "addps    xmm12,xmm13;"
+                                      "addps    xmm12,xmm14;"
+                                      "mulps    xmm12,xmm15;"
+                                      "movaps   %4,xmm12"
+                                      : "=x"(w1), "=x"(w2), "=x"(w3), "=x"(dd), "=m"(sas_current_texcoord[0])
+                                      : "x"(s), "x"(t), "r"(xmm_one), "x"(d1), "x"(d2), "x"(d3), "m"(*(sas_xmm_t *)t1), "m"(*(sas_xmm_t *)t2), "m"(*(sas_xmm_t *)t3)
+                                      : "xmm0", "xmm12", "xmm13", "xmm14", "xmm15");
+            }
 #else
             // Get weighting
             float w1 = 1.f - s - t, w2 = s, w3 = t;
@@ -425,10 +503,13 @@ void sas_do_triangle(sas_color_t c1, float *t1, float *v1, int i1, sas_color_t c
             // Depth multiplier for perspective correct mapping
             float dd = 1.f / (w1 + w2 + w3);
 
-            sas_current_color.r = (c1.r * w1 + c2.r * w2 + c3.r * w3) * dd;
-            sas_current_color.g = (c1.g * w1 + c2.g * w2 + c3.g * w3) * dd;
-            sas_current_color.b = (c1.b * w1 + c2.b * w2 + c3.b * w3) * dd;
-            sas_current_color.a = (c1.a * w1 + c2.a * w2 + c3.a * w3) * dd;
+            if (sas_smooth_shading)
+            {
+                sas_current_color.r = (c1.r * w1 + c2.r * w2 + c3.r * w3) * dd;
+                sas_current_color.g = (c1.g * w1 + c2.g * w2 + c3.g * w3) * dd;
+                sas_current_color.b = (c1.b * w1 + c2.b * w2 + c3.b * w3) * dd;
+                sas_current_color.a = (c1.a * w1 + c2.a * w2 + c3.a * w3) * dd;
+            }
 
             // TODO: Which texture unit to use
             sas_current_texcoord[0][0] = (t1[0] * w1 + t2[0] * w2 + t3[0] * w3) * dd;
@@ -472,13 +553,12 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
         if (sas_triangle_index == 3)
         {
-            sas_color_t curcol = sas_current_color;
-
-
             sas_triangle_index = 0;
 
 #ifdef THREADING
             sas_draw_thread_info_t dti;
+
+            dti.current_color = sas_current_color;
 
 
             memcpy(&dti.vertex_positions[0], &sas_quad_positions[0], sizeof(float) * 4);
@@ -499,16 +579,19 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
             sas_thread_execute(sas_do_triangle, &dti, sizeof(dti));
 #else
+            sas_color_t curcol = sas_current_color;
+
+
             sas_do_triangle(sas_triangle_colors[0], sas_triangle_texcoords[0], sas_triangle_positions[0], 0,
                             sas_triangle_colors[1], sas_triangle_texcoords[1], sas_triangle_positions[1], 1,
                             sas_triangle_colors[2], sas_triangle_texcoords[2], sas_triangle_positions[2], 2);
+
+
+            sas_current_color = curcol;
 #endif
 
 
             sas_flush_varyings();
-
-
-            sas_current_color = curcol;
         }
     }
     else if (sas_current_mode == GL_QUADS)
@@ -520,13 +603,12 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
         if (sas_quad_index == 4)
         {
-            sas_color_t curcol = sas_current_color;
-
-
             sas_quad_index = 0;
 
 #ifdef THREADING
             sas_draw_thread_info_t dti;
+
+            dti.current_color = sas_current_color;
 
 
             memcpy(&dti.vertex_positions[0], &sas_quad_positions[0], sizeof(float) * 4);
@@ -566,6 +648,9 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
             sas_thread_execute(sas_do_triangle, &dti, sizeof(dti));
 #else
+            sas_color_t curcol = sas_current_color;
+
+
             sas_do_triangle(sas_quad_colors[0], sas_quad_texcoords[0], sas_quad_positions[0], 0,
                             sas_quad_colors[1], sas_quad_texcoords[1], sas_quad_positions[1], 1,
                             sas_quad_colors[2], sas_quad_texcoords[2], sas_quad_positions[2], 2);
@@ -573,13 +658,13 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
             sas_do_triangle(sas_quad_colors[2], sas_quad_texcoords[2], sas_quad_positions[2], 2,
                             sas_quad_colors[3], sas_quad_texcoords[3], sas_quad_positions[3], 3,
                             sas_quad_colors[0], sas_quad_texcoords[0], sas_quad_positions[0], 0);
+
+
+            sas_current_color = curcol;
 #endif
 
 
             sas_flush_varyings();
-
-
-            sas_current_color = curcol;
         }
     }
     else if (sas_current_mode == GL_QUAD_STRIP)
@@ -591,13 +676,12 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
         if (sas_quad_index == 4)
         {
-            sas_color_t curcol = sas_current_color;
-
-
             sas_quad_index = 2;
 
 #ifdef THREADING
             sas_draw_thread_info_t dti;
+
+            dti.current_color = sas_current_color;
 
 
             memcpy(&dti.vertex_positions[0], &sas_quad_positions[0], sizeof(float) * 4);
@@ -637,6 +721,9 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
             sas_thread_execute(sas_do_triangle, &dti, sizeof(dti));
 #else
+            sas_color_t curcol = sas_current_color;
+
+
             sas_do_triangle(sas_quad_colors[0], sas_quad_texcoords[0], sas_quad_positions[0], 0,
                             sas_quad_colors[1], sas_quad_texcoords[1], sas_quad_positions[1], 1,
                             sas_quad_colors[3], sas_quad_texcoords[3], sas_quad_positions[3], 3);
@@ -644,6 +731,9 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
             sas_do_triangle(sas_quad_colors[3], sas_quad_texcoords[3], sas_quad_positions[3], 3,
                             sas_quad_colors[2], sas_quad_texcoords[2], sas_quad_positions[2], 2,
                             sas_quad_colors[0], sas_quad_texcoords[0], sas_quad_positions[0], 0);
+
+
+            sas_current_color = curcol;
 #endif
 
             sas_flush_varyings_partially(2);
@@ -651,9 +741,6 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
             memcpy(&sas_quad_colors[0], &sas_quad_colors[2], sizeof(sas_quad_colors[0]) * 2);
             memcpy(&sas_quad_texcoords[0], &sas_quad_texcoords[2], sizeof(sas_quad_texcoords[0]) * 2);
             memcpy(&sas_quad_positions[0], &sas_quad_positions[2], sizeof(sas_quad_positions[0]) * 2);
-
-
-            sas_current_color = curcol;
         }
     }
 }
