@@ -4,9 +4,15 @@
 #define gl_Normal sas_current_normal
 #define gl_MultiTexCoord0 sas_multi_texcoord0
 
+#define gl_TexCoord sas_current_texcoord
+#define gl_FrontColor sas_current_color
+
 
 extern "C" vec4 gl_Position;
 extern "C" const vec4 gl_Vertex, gl_MultiTexCoord0;
+
+extern "C" vec4 gl_TexCoord[8];
+extern "C" vec4 gl_FrontColor;
 
 extern "C" const vec3 gl_Normal;
 

@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include <pthread.h>
@@ -22,7 +23,7 @@ struct sas_thread_info
     bool unemployed;
 
     void (*execute)(void *param);
-    void *param;
+    volatile void *param;
 };
 
 
@@ -40,16 +41,26 @@ static void *thread_entry(void *i)
     info->unemployed = true;
 
 
+    void *mem;
+
     for (;;)
     {
         pthread_cond_wait(&info->work_available, &info->wa_mutex);
 
+        mem = (void *)info->param;
+        info->param = NULL;
 
-        info->execute(info->param);
-        free(info->param);
+        // le FIXME
+        if (mem == NULL)
+            continue;
+
+
+        info->execute(mem);
+        free(mem);
 
 
         info->unemployed = true;
+
         sem_post(&free_threads);
     }
 
@@ -113,7 +124,11 @@ void sas_thread_execute(void (*function)(void *data), void *data, size_t size)
             threads[i].execute = function;
             threads[i].param = tmp;
 
-            pthread_cond_signal(&threads[i].work_available);
+            do
+                pthread_cond_signal(&threads[i].work_available);
+            while (threads[i].param != NULL);
+
+            break;
         }
     }
 }

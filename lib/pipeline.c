@@ -1,6 +1,11 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
+
+#ifdef THREADING
+#include <pthread.h>
+#endif
 
 #include <soft-and-slow/context.h>
 #include <soft-and-slow/helpers.h>
@@ -23,7 +28,7 @@ extern bool (*sas_depth_func)(float new, float current);
 extern bool (*sas_alpha_func)(float new, float ref);
 
 extern void (*sas_vertex_transformation)(void);
-extern void (*sas_fragment_transformation)(void);
+extern void (*sas_fragment_transformation)(sas_draw_thread_info_t *dti);
 
 extern sas_color_t sas_current_color;
 extern float sas_current_vertex[4], sas_current_position[4];
@@ -45,9 +50,22 @@ void sas_transform_vertex_to_screen(void)
 
 bool sas_depth_test(sas_context_t ctx, unsigned i, float d)
 {
+#ifdef THREADING
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
+
+
     SAS_DEPTH_TYPE *depth_ptr = &ctx->depthbuffer[i];
 
+#ifdef THREADING
+    pthread_mutex_lock(&lock);
+    bool depth_result = sas_depth_func(d, *depth_ptr);
+    pthread_mutex_unlock(&lock);
+
+    if (depth_result)
+#else
     if (sas_depth_func(d, *depth_ptr))
+#endif
     {
         *depth_ptr = d;
         return true;
@@ -91,18 +109,44 @@ void sas_blend_pixel(sas_context_t ctx, unsigned i, sas_color_t color)
 }
 
 
+#ifdef THREADING
+void sas_transform_fragment(sas_draw_thread_info_t *dti)
+{
+    // FIXME: Review locking (nothing here, but in sas_depth_test)
+
+    dti->current_position[2] = dti->current_position[2] * sas_far_depth + (1.f - dti->current_position[2]) * sas_near_depth;
+
+
+    if (sas_do_alpha_test && !sas_alpha_test(dti->current_color.a))
+        return;
+
+    if (sas_do_depth_test && !sas_depth_test(current_sas_context, dti->current_buf_index, dti->current_position[2]))
+        return;
+
+    sas_fragment_transformation(dti);
+
+    sas_blend_pixel(current_sas_context, dti->current_buf_index, dti->current_color);
+}
+#else
 void sas_transform_fragment(void)
 {
     sas_current_position[2] = sas_current_position[2] * sas_far_depth + (1.f - sas_current_position[2]) * sas_near_depth;
 
 
-    if (sas_do_alpha_test && !sas_alpha_test(sas_current_color.a / 255.f))
+    if (sas_do_alpha_test && !sas_alpha_test(sas_current_color.a))
         return;
 
     if (sas_do_depth_test && !sas_depth_test(current_sas_context, sas_current_buf_index, sas_current_position[2]))
         return;
 
-    sas_fragment_transformation();
+    sas_draw_thread_info_t dummy_dti;
+
+    memcpy(dummy_dti.current_position, sas_current_position, sizeof(float) * 4);
+    dummy_dti.current_color = sas_current_color;
+    memcpy(dummy_dti.current_texcoord, sas_current_texcoord, sizeof(float) * 4 * 8);
+
+    sas_fragment_transformation(&dummy_dti);
 
     sas_blend_pixel(current_sas_context, sas_current_buf_index, sas_current_color);
 }
+#endif
