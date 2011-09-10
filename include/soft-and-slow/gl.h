@@ -34,6 +34,8 @@ GLenum glGetError(void);
 void glCullFace(GLenum mode);
 void glFrontFace(GLenum mode);
 
+void glShadeModel(GLenum mode);
+
 void glDepthFunc(GLenum func);
 void glAlphaFunc(GLenum func, GLclampf ref);
 

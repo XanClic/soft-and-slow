@@ -144,5 +144,8 @@
 #define GL_AMBIENT_AND_DIFFUSE 0x1602
 #define GL_NORMALIZE           0x0BA1
 
+#define GL_FLAT   0x1D00
+#define GL_SMOOTH 0x1D01
+
 
 #endif

@@ -67,7 +67,8 @@ void sas_spawn_threads(void)
     if (sas_thread_count < 1)
         sas_thread_count = 1;
 
-    sas_thread_count *= 2;
+    // Well, works fine...
+    sas_thread_count *= 10;
 
 
     if (sem_init(&free_threads, 0, sas_thread_count))
