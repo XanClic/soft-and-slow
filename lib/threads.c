@@ -23,7 +23,7 @@ struct sas_thread_info
     bool unemployed;
 
     void (*execute)(void *param);
-    volatile void *param;
+    void *param;
 };
 
 
@@ -41,22 +41,13 @@ static void *thread_entry(void *i)
     info->unemployed = true;
 
 
-    void *mem;
-
     for (;;)
     {
         pthread_cond_wait(&info->work_available, &info->wa_mutex);
 
-        mem = (void *)info->param;
-        info->param = NULL;
 
-        // le FIXME
-        if (mem == NULL)
-            continue;
-
-
-        info->execute(mem);
-        free(mem);
+        info->execute(info->param);
+        free(info->param);
 
 
         info->unemployed = true;
@@ -124,9 +115,13 @@ void sas_thread_execute(void (*function)(void *data), void *data, size_t size)
             threads[i].execute = function;
             threads[i].param = tmp;
 
-            do
-                pthread_cond_signal(&threads[i].work_available);
-            while (threads[i].param != NULL);
+            // pthread_cond_wait will release the mutex and we have to wait
+            // until the thread is waiting for the condition signal (else
+            // our signal will get lost).
+            pthread_mutex_lock(&threads[i].wa_mutex);
+            pthread_mutex_unlock(&threads[i].wa_mutex);
+
+            pthread_cond_signal(&threads[i].work_available);
 
             break;
         }
