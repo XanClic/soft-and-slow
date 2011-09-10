@@ -33,6 +33,7 @@ void glGetFloatv(GLenum pname, float *params);
 GLenum glGetError(void);
 void glCullFace(GLenum mode);
 void glFrontFace(GLenum mode);
+const GLubyte *glGetString(GLenum name);
 
 void glShadeModel(GLenum mode);
 
