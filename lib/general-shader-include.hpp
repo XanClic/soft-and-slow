@@ -196,17 +196,10 @@ typedef int sampler2D;
 #define gl_ModelViewProjectionMatrix sas_modelviewprojection
 #define gl_NormalMatrix sas_normal_matrix
 
-#define gl_TexCoord sas_current_texcoord
-#define gl_FrontColor sas_current_color
-
-
-extern "C" vec4 gl_TexCoord[8];
 
 extern "C" mat4 gl_ModelViewProjectionMatrix;
 extern "C" mat3 gl_NormalMatrix;
 extern "C" mat4 gl_ModelViewMatrix, gl_ProjectionMatrix;
-
-extern "C" vec4 gl_FrontColor;
 
 
 // I do love casts without involving the compiler (this function actually

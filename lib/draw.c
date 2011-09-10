@@ -9,6 +9,7 @@
 #include <soft-and-slow/helpers.h>
 #include <soft-and-slow/pipeline.h>
 #include <soft-and-slow/shader.h>
+#include <soft-and-slow/threads.h>
 #include <soft-and-slow/types.h>
 
 
@@ -108,6 +109,173 @@ void glNormal3f(GLfloat x, GLfloat y, GLfloat z)
 static float xmm_one[4]        = { 1.f, 1.f, 1.f, 1.f };
 
 
+#ifdef THREADING
+void sas_do_triangle(void *dti_voidptr)
+{
+    sas_draw_thread_info_t *dti = dti_voidptr;
+
+    float vec1[4] = {
+        (dti->vertex_positions[1][0] - dti->vertex_positions[0][0]) * .5f,
+        (dti->vertex_positions[1][1] - dti->vertex_positions[0][1]) * .5f,
+        (dti->vertex_positions[1][2] - dti->vertex_positions[0][2]) * .5f,
+         dti->vertex_positions[1][3] - dti->vertex_positions[0][3]
+    };
+
+    float vec2[4] = {
+        (dti->vertex_positions[2][0] - dti->vertex_positions[0][0]) * .5f,
+        (dti->vertex_positions[2][1] - dti->vertex_positions[0][1]) * .5f,
+        (dti->vertex_positions[2][2] - dti->vertex_positions[0][2]) * .5f,
+         dti->vertex_positions[2][3] - dti->vertex_positions[0][3]
+    };
+
+    float bv[4] = {
+        dti->vertex_positions[0][0] * .5f + .5f,
+        dti->vertex_positions[0][1] * .5f + .5f,
+        dti->vertex_positions[0][2] * .5f + .5f,
+        dti->vertex_positions[0][3]
+    };
+
+    if (sas_do_cw_culling || sas_do_ccw_culling)
+    {
+        if (vec1[0] * vec2[1] > vec1[1] * vec2[0])
+        {
+            if (sas_do_ccw_culling)
+                return;
+        }
+        else if (sas_do_cw_culling)
+            return;
+    }
+
+    float d1 = .5f - dti->vertex_positions[0][2] * .5f;
+    float d2 = .5f - dti->vertex_positions[1][2] * .5f;
+    float d3 = .5f - dti->vertex_positions[2][2] * .5f;
+
+
+    float st_div = 1.f / (vec1[0] * vec2[1] - vec1[1] * vec2[0]);
+
+
+    int start_x = (int)floorf((min(dti->vertex_positions[0][0], min(dti->vertex_positions[1][0], dti->vertex_positions[2][0])) * .5f + .5f) * current_sas_context->width );
+    int end_x   = (int)ceilf ((max(dti->vertex_positions[0][0], max(dti->vertex_positions[1][0], dti->vertex_positions[2][0])) * .5f + .5f) * current_sas_context->width );
+    int start_y = (int)floorf((.5f - max(dti->vertex_positions[0][1], max(dti->vertex_positions[1][1], dti->vertex_positions[2][1])) * .5f) * current_sas_context->height);
+    int end_y   = (int)ceilf ((.5f - min(dti->vertex_positions[0][1], min(dti->vertex_positions[1][1], dti->vertex_positions[2][1])) * .5f) * current_sas_context->height);
+
+    if (start_x < 0)
+        start_x = 0;
+    if (start_y < 0)
+        start_y = 0;
+
+    if (end_x >= (int)current_sas_context->width)
+        end_x = current_sas_context->width - 1;
+    if (end_y >= (int)current_sas_context->height)
+        end_y = current_sas_context->height - 1;
+
+
+    for (int y = start_y; y < end_y; y++)
+    {
+        dti->current_buf_index = y * current_sas_context->width + start_x;
+
+        for (int x = start_x; x < end_x; x++)
+        {
+            dti->current_position[0] =       (float)x / (float)current_sas_context->width;
+            dti->current_position[1] = 1.f - (float)y / (float)current_sas_context->height;
+
+            dti->current_buf_index++;
+
+            float xs = dti->current_position[0] - bv[0];
+            float ys = dti->current_position[1] - bv[1];
+
+            float s =  (xs * vec2[1] - ys * vec2[0]) * st_div;
+            float t = -(xs * vec1[1] - ys * vec1[0]) * st_div;
+
+            if ((s < 0.f) || (t < 0.f) || (s + t > 1.f))
+                continue;
+
+            dti->current_position[2] = bv[2] + s * vec1[2] + t * vec2[2];
+            dti->current_position[3] = bv[3] + s * vec1[3] + t * vec2[3];
+
+
+            if ((dti->current_position[2] < 0.f) || (dti->current_position[2] >= 1.f))
+                continue;
+
+
+#ifdef USE_ASSEMBLY
+            float w1, w2, w3, dd;
+
+            __asm__ __volatile__ ("pshufd   xmm13,%6,0x00;" // w2 = s
+                                  "pshufd   xmm14,%7,0x00;" // w3 = t
+                                  "movaps   xmm12,[%8];"
+                                  "subps    xmm12,xmm13;"
+                                  "subps    xmm12,xmm14;"   // w1 = 1 - s - t
+                                  "pshufd   xmm0,%9,0x00;"
+                                  "mulps    xmm12,xmm0;"    // w1 *= d1
+                                  "pshufd   xmm0,%10,0x00;"
+                                  "mulps    xmm13,xmm0;"    // w2 *= d2
+                                  "pshufd   xmm0,%11,0x00;"
+                                  "mulps    xmm14,xmm0;"    // w3 *= d3
+                                  "movaps   xmm15,xmm12;"
+                                  "addps    xmm15,xmm13;"
+                                  "addps    xmm15,xmm14;"
+                                  "rcpps    xmm15,xmm15;"   // dd = 1 / (w1 + w2 + w3)
+                                  "movss    %0,xmm12;"
+                                  "movss    %1,xmm13;"
+                                  "movss    %2,xmm14;"
+                                  "movss    %3,xmm15;"
+
+                                  "movaps   xmm0,%12;"
+                                  "mulps    xmm0,xmm12;"
+                                  "movaps   xmm1,%13;"
+                                  "mulps    xmm1,xmm13;"
+                                  "addps    xmm0,xmm1;"
+                                  "movaps   xmm1,%14;"
+                                  "mulps    xmm1,xmm14;"
+                                  "addps    xmm0,xmm1;"
+                                  "mulps    xmm0,xmm15;"
+                                  "movaps   %4,xmm0;"
+
+                                  "mulps    xmm12,%15;"
+                                  "mulps    xmm13,%16;"
+                                  "mulps    xmm14,%17;"
+                                  "addps    xmm12,xmm13;"
+                                  "addps    xmm12,xmm14;"
+                                  "mulps    xmm12,xmm15;"
+                                  "movaps   %5,xmm12"
+                                  : "=x"(w1), "=x"(w2), "=x"(w3), "=x"(dd), "=m"(dti->current_color), "=m"(dti->current_texcoord[0])
+                                  : "x"(s), "x"(t), "r"(xmm_one),
+                                    "x"(d1), "x"(d2), "x"(d3),
+                                    "m"(dti->vertex_colors[0]), "m"(dti->vertex_colors[1]), "m"(dti->vertex_colors[2]),
+                                    "m"(*(sas_xmm_t *)dti->vertex_texcoords[0]), "m"(*(sas_xmm_t *)dti->vertex_texcoords[1]), "m"(*(sas_xmm_t *)dti->vertex_texcoords[2])
+                                  : "xmm0", "xmm1", "xmm12", "xmm13", "xmm14", "xmm15");
+#else
+            // Get weighting
+            float w1 = 1.f - s - t, w2 = s, w3 = t;
+
+            // Multiply by inverse depth in order to map perspectively correct
+            w1 *= d1;
+            w2 *= d2;
+            w3 *= d3;
+
+            // Depth multiplier for perspective correct mapping
+            float dd = 1.f / (w1 + w2 + w3);
+
+            dti->current_color.r = (dti->vertex_colors[0].r * w1 + dti->vertex_colors[1].r * w2 + dti->vertex_colors[2].r * w3) * dd;
+            dti->current_color.g = (dti->vertex_colors[0].g * w1 + dti->vertex_colors[1].g * w2 + dti->vertex_colors[2].g * w3) * dd;
+            dti->current_color.b = (dti->vertex_colors[0].b * w1 + dti->vertex_colors[1].b * w2 + dti->vertex_colors[2].b * w3) * dd;
+            dti->current_color.a = (dti->vertex_colors[0].a * w1 + dti->vertex_colors[1].a * w2 + dti->vertex_colors[2].a * w3) * dd;
+
+            // TODO: Which texture unit to use
+            dti->current_texcoord[0][0] = (dti->vertex_texcoords[0][0] * w1 + dti->vertex_texcoords[1][0] * w2 + dti->vertex_texcoords[2][0] * w3) * dd;
+            dti->current_texcoord[0][1] = (dti->vertex_texcoords[0][1] * w1 + dti->vertex_texcoords[1][1] * w2 + dti->vertex_texcoords[2][1] * w3) * dd;
+            dti->current_texcoord[0][2] = (dti->vertex_texcoords[0][2] * w1 + dti->vertex_texcoords[1][2] * w2 + dti->vertex_texcoords[2][2] * w3) * dd;
+            dti->current_texcoord[0][3] = (dti->vertex_texcoords[0][3] * w1 + dti->vertex_texcoords[1][3] * w2 + dti->vertex_texcoords[2][3] * w3) * dd;
+#endif
+
+//          sas_calc_varyings(i1, i2, i3, w1, w2, w3, dd);
+
+            sas_transform_fragment(dti);
+        }
+    }
+}
+#else
 // Fills a triangle.
 void sas_do_triangle(sas_color_t c1, float *t1, float *v1, int i1, sas_color_t c2, float *t2, float *v2, int i2, sas_color_t c3, float *t3, float *v3, int i3)
 {
@@ -243,7 +411,7 @@ void sas_do_triangle(sas_color_t c1, float *t1, float *v1, int i1, sas_color_t c
                                   "mulps    xmm12,xmm15;"
                                   "movaps   %5,xmm12"
                                   : "=x"(w1), "=x"(w2), "=x"(w3), "=x"(dd), "=m"(sas_current_color), "=m"(sas_current_texcoord[0])
-                                  : "x"(s), "x"(t), "r"(xmm_one), "x"(d1), "x"(d2), "x"(d3), "m"(c1), "m"(c2), "m"(c3), "m"(*(sas_color_t *)t1), "m"(*(sas_color_t *)t2), "m"(*(sas_color_t *)t3)
+                                  : "x"(s), "x"(t), "r"(xmm_one), "x"(d1), "x"(d2), "x"(d3), "m"(c1), "m"(c2), "m"(c3), "m"(*(sas_xmm_t *)t1), "m"(*(sas_xmm_t *)t2), "m"(*(sas_xmm_t *)t3)
                                   : "xmm0", "xmm1", "xmm12", "xmm13", "xmm14", "xmm15");
 #else
             // Get weighting
@@ -275,6 +443,7 @@ void sas_do_triangle(sas_color_t c1, float *t1, float *v1, int i1, sas_color_t c
         }
     }
 }
+#endif
 
 void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 {
@@ -289,7 +458,9 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
     if (sas_current_mode == GL_POINTS)
     {
+#ifndef THREADING
         sas_transform_fragment();
+#endif
 
         sas_flush_varyings();
     }
@@ -306,9 +477,32 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
             sas_triangle_index = 0;
 
+#ifdef THREADING
+            sas_draw_thread_info_t dti;
+
+
+            memcpy(&dti.vertex_positions[0], &sas_quad_positions[0], sizeof(float) * 4);
+            memcpy(&dti.vertex_positions[1], &sas_quad_positions[1], sizeof(float) * 4);
+            memcpy(&dti.vertex_positions[2], &sas_quad_positions[2], sizeof(float) * 4);
+
+            dti.vertex_colors[0] = sas_quad_colors[0];
+            dti.vertex_colors[1] = sas_quad_colors[1];
+            dti.vertex_colors[2] = sas_quad_colors[2];
+
+            memcpy(&dti.vertex_texcoords[0], &sas_quad_texcoords[0], sizeof(float) * 4);
+            memcpy(&dti.vertex_texcoords[1], &sas_quad_texcoords[1], sizeof(float) * 4);
+            memcpy(&dti.vertex_texcoords[2], &sas_quad_texcoords[2], sizeof(float) * 4);
+
+            dti.vertex_indizes[0] = 0;
+            dti.vertex_indizes[1] = 1;
+            dti.vertex_indizes[2] = 2;
+
+            sas_thread_execute(sas_do_triangle, &dti, sizeof(dti));
+#else
             sas_do_triangle(sas_triangle_colors[0], sas_triangle_texcoords[0], sas_triangle_positions[0], 0,
                             sas_triangle_colors[1], sas_triangle_texcoords[1], sas_triangle_positions[1], 1,
                             sas_triangle_colors[2], sas_triangle_texcoords[2], sas_triangle_positions[2], 2);
+#endif
 
 
             sas_flush_varyings();
@@ -331,6 +525,47 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
             sas_quad_index = 0;
 
+#ifdef THREADING
+            sas_draw_thread_info_t dti;
+
+
+            memcpy(&dti.vertex_positions[0], &sas_quad_positions[0], sizeof(float) * 4);
+            memcpy(&dti.vertex_positions[1], &sas_quad_positions[1], sizeof(float) * 4);
+            memcpy(&dti.vertex_positions[2], &sas_quad_positions[2], sizeof(float) * 4);
+
+            dti.vertex_colors[0] = sas_quad_colors[0];
+            dti.vertex_colors[1] = sas_quad_colors[1];
+            dti.vertex_colors[2] = sas_quad_colors[2];
+
+            memcpy(&dti.vertex_texcoords[0], &sas_quad_texcoords[0], sizeof(float) * 4);
+            memcpy(&dti.vertex_texcoords[1], &sas_quad_texcoords[1], sizeof(float) * 4);
+            memcpy(&dti.vertex_texcoords[2], &sas_quad_texcoords[2], sizeof(float) * 4);
+
+            dti.vertex_indizes[0] = 0;
+            dti.vertex_indizes[1] = 1;
+            dti.vertex_indizes[2] = 2;
+
+            sas_thread_execute(sas_do_triangle, &dti, sizeof(dti));
+
+
+            memcpy(&dti.vertex_positions[0], &sas_quad_positions[2], sizeof(float) * 4);
+            memcpy(&dti.vertex_positions[1], &sas_quad_positions[3], sizeof(float) * 4);
+            memcpy(&dti.vertex_positions[2], &sas_quad_positions[0], sizeof(float) * 4);
+
+            dti.vertex_colors[0] = sas_quad_colors[2];
+            dti.vertex_colors[1] = sas_quad_colors[3];
+            dti.vertex_colors[2] = sas_quad_colors[0];
+
+            memcpy(&dti.vertex_texcoords[0], &sas_quad_texcoords[2], sizeof(float) * 4);
+            memcpy(&dti.vertex_texcoords[1], &sas_quad_texcoords[3], sizeof(float) * 4);
+            memcpy(&dti.vertex_texcoords[2], &sas_quad_texcoords[0], sizeof(float) * 4);
+
+            dti.vertex_indizes[0] = 2;
+            dti.vertex_indizes[1] = 3;
+            dti.vertex_indizes[2] = 0;
+
+            sas_thread_execute(sas_do_triangle, &dti, sizeof(dti));
+#else
             sas_do_triangle(sas_quad_colors[0], sas_quad_texcoords[0], sas_quad_positions[0], 0,
                             sas_quad_colors[1], sas_quad_texcoords[1], sas_quad_positions[1], 1,
                             sas_quad_colors[2], sas_quad_texcoords[2], sas_quad_positions[2], 2);
@@ -338,6 +573,7 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
             sas_do_triangle(sas_quad_colors[2], sas_quad_texcoords[2], sas_quad_positions[2], 2,
                             sas_quad_colors[3], sas_quad_texcoords[3], sas_quad_positions[3], 3,
                             sas_quad_colors[0], sas_quad_texcoords[0], sas_quad_positions[0], 0);
+#endif
 
 
             sas_flush_varyings();
@@ -360,6 +596,47 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 
             sas_quad_index = 2;
 
+#ifdef THREADING
+            sas_draw_thread_info_t dti;
+
+
+            memcpy(&dti.vertex_positions[0], &sas_quad_positions[0], sizeof(float) * 4);
+            memcpy(&dti.vertex_positions[1], &sas_quad_positions[1], sizeof(float) * 4);
+            memcpy(&dti.vertex_positions[2], &sas_quad_positions[3], sizeof(float) * 4);
+
+            dti.vertex_colors[0] = sas_quad_colors[0];
+            dti.vertex_colors[1] = sas_quad_colors[1];
+            dti.vertex_colors[2] = sas_quad_colors[3];
+
+            memcpy(&dti.vertex_texcoords[0], &sas_quad_texcoords[0], sizeof(float) * 4);
+            memcpy(&dti.vertex_texcoords[1], &sas_quad_texcoords[1], sizeof(float) * 4);
+            memcpy(&dti.vertex_texcoords[2], &sas_quad_texcoords[3], sizeof(float) * 4);
+
+            dti.vertex_indizes[0] = 0;
+            dti.vertex_indizes[1] = 1;
+            dti.vertex_indizes[2] = 3;
+
+            sas_thread_execute(sas_do_triangle, &dti, sizeof(dti));
+
+
+            memcpy(&dti.vertex_positions[0], &sas_quad_positions[3], sizeof(float) * 4);
+            memcpy(&dti.vertex_positions[1], &sas_quad_positions[2], sizeof(float) * 4);
+            memcpy(&dti.vertex_positions[2], &sas_quad_positions[0], sizeof(float) * 4);
+
+            dti.vertex_colors[0] = sas_quad_colors[3];
+            dti.vertex_colors[1] = sas_quad_colors[2];
+            dti.vertex_colors[2] = sas_quad_colors[0];
+
+            memcpy(&dti.vertex_texcoords[0], &sas_quad_texcoords[3], sizeof(float) * 4);
+            memcpy(&dti.vertex_texcoords[1], &sas_quad_texcoords[2], sizeof(float) * 4);
+            memcpy(&dti.vertex_texcoords[2], &sas_quad_texcoords[0], sizeof(float) * 4);
+
+            dti.vertex_indizes[0] = 3;
+            dti.vertex_indizes[1] = 2;
+            dti.vertex_indizes[2] = 0;
+
+            sas_thread_execute(sas_do_triangle, &dti, sizeof(dti));
+#else
             sas_do_triangle(sas_quad_colors[0], sas_quad_texcoords[0], sas_quad_positions[0], 0,
                             sas_quad_colors[1], sas_quad_texcoords[1], sas_quad_positions[1], 1,
                             sas_quad_colors[3], sas_quad_texcoords[3], sas_quad_positions[3], 3);
@@ -367,6 +644,7 @@ void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
             sas_do_triangle(sas_quad_colors[3], sas_quad_texcoords[3], sas_quad_positions[3], 3,
                             sas_quad_colors[2], sas_quad_texcoords[2], sas_quad_positions[2], 2,
                             sas_quad_colors[0], sas_quad_texcoords[0], sas_quad_positions[0], 0);
+#endif
 
             sas_flush_varyings_partially(2);
 

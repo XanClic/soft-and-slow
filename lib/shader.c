@@ -17,7 +17,7 @@
 extern GLenum sas_error;
 
 extern void (*sas_vertex_transformation)(void);
-extern void (*sas_fragment_transformation)(void);
+extern void (*sas_fragment_transformation)(sas_draw_thread_info_t *);
 
 
 // Definitions required to turn GLSL into C++
@@ -297,7 +297,7 @@ void glCompileShader(GLuint id)
     if (shaders[id]->type == GL_VERTEX_SHADER)
         system("sed -i 's/void\\s\\+main(.*)/void sas_vertex_transform(void)/' /tmp/.soft-and-slow.cpp");
     else
-        system("sed -i 's/void\\s\\+main(.*)/void sas_fragment_transform(void)/' /tmp/.soft-and-slow.cpp");
+        system("sed -i 's/void\\s\\+main(.*)/void sas_fragment_transform(__draw_thread_info *__dti)/' /tmp/.soft-and-slow.cpp");
 
     system("sed -i 's/uniform\\s\\+\\(\\w\\+\\)\\s\\+\\(\\w\\+\\)/#define \\2 sas_uniform_\\2\\n\\1 \\2/g' /tmp/.soft-and-slow.cpp");
 
@@ -474,8 +474,10 @@ void glLinkProgram(GLuint id)
         fclose(tfp);
     }
 
+    // If we don't add some random stuff, dlopen thinks we are using the same
+    // file all over again and reacts as such. Very nice.
     char soname[64];
-    sprintf(soname, "/tmp/.soft-and-slow-%i.so", (int)id);
+    sprintf(soname, "/tmp/.soft-and-slow-%i-%i.so", (int)id, rand());
 
 
     FILE *tfp = fopen("/tmp/.soft-and-slow-common.cpp", "w");
@@ -616,7 +618,7 @@ void glUseProgram(GLuint id)
 
 
     sas_vertex_transformation   = (void (*)(void))(uintptr_t)dlsym(programs[id]->dl, "sas_vertex_transform");
-    sas_fragment_transformation = (void (*)(void))(uintptr_t)dlsym(programs[id]->dl, "sas_fragment_transform");
+    sas_fragment_transformation = (void (*)(sas_draw_thread_info_t *))(uintptr_t)dlsym(programs[id]->dl, "sas_fragment_transform");
 
     current_program = programs[id];
 }

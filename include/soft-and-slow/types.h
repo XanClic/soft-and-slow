@@ -108,6 +108,26 @@ struct sas_xmm
 } cc_packed;
 
 
+typedef struct sas_draw_thread_info sas_draw_thread_info_t;
+
+struct sas_draw_thread_info
+{
+    float current_position[4];
+    sas_color_t current_color;
+    float current_texcoord[8][4];
+
+#ifdef THREADING
+    float vertex_positions[3][4];
+    sas_color_t vertex_colors[3];
+    float vertex_texcoords[3][4];
+    int vertex_indizes[3];
+
+
+    unsigned current_buf_index;
+#endif
+};
+
+
 #include "light.h"
 
 #endif
