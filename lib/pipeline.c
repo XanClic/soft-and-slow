@@ -143,10 +143,10 @@ void sas_transform_fragment(void)
 
     memcpy(dummy_dti.current_position, sas_current_position, sizeof(float) * 4);
     dummy_dti.current_color = sas_current_color;
-    memcpy(dummy_dti.current_texcoord, sas_current_texcoord, sizeof(float) * 4 * 8);
+    memcpy(dummy_dti.current_texcoord[0], sas_current_texcoord[0], sizeof(float) * 4);
 
     sas_fragment_transformation(&dummy_dti);
 
-    sas_blend_pixel(current_sas_context, sas_current_buf_index, sas_current_color);
+    sas_blend_pixel(current_sas_context, sas_current_buf_index, dummy_dti.current_color);
 }
 #endif
