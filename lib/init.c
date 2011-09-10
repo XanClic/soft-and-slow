@@ -26,9 +26,17 @@ extern const void _binary_fixed_fragment_light_transformation_glsl_size;
 
 void sas_load_fixed_pipeline(bool lighting)
 {
-    // This is not exactly according to the specification (it actually opposes
-    // it), but who cares anyway?
-    glDeleteProgram(0);
+    static bool did_once = false;
+
+
+    if (!did_once)
+        did_once = true;
+    else
+    {
+        // This is not exactly according to the specification (it actually opposes
+        // it), but who cares anyway?
+        glDeleteProgram(0);
+    }
 
 
     assert(!glCreateProgram());
