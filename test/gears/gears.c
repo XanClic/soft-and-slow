@@ -178,16 +178,20 @@ gear(GLfloat inner_radius, GLfloat outer_radius, GLfloat width,
 }
 
 static GLfloat view_rotx = 20.0, view_roty = 30.0, view_rotz = 0.0;
+static GLint gear1, gear2, gear3;
 static GLfloat angle = 0.0;
+
+static void
+cleanup(void)
+{
+  glDeleteLists(gear1, 1);
+  glDeleteLists(gear2, 1);
+  glDeleteLists(gear3, 1);
+}
 
 static void
 draw(void)
 {
-  static GLfloat red[4] = {0.8, 0.1, 0.0, 1.0};
-  static GLfloat green[4] = {0.0, 0.8, 0.2, 1.0};
-  static GLfloat blue[4] = {0.2, 0.2, 1.0, 1.0};
-
-
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   glPushMatrix();
@@ -201,22 +205,19 @@ draw(void)
     glPushMatrix();
       glTranslatef(-3.0, -2.0, 0.0);
       glRotatef(angle, 0.0, 0.0, 1.0);
-      glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, red);
-      gear(1.0, 4.0, 1.0, 20, 0.7);
+      glCallList(gear1);
     glPopMatrix();
 
     glPushMatrix();
       glTranslatef(3.1, -2.0, 0.0);
       glRotatef(-2.0 * angle - 9.0, 0.0, 0.0, 1.0);
-      glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, green);
-      gear(0.5, 2.0, 2.0, 10, 0.7);
+      glCallList(gear2);
     glPopMatrix();
 
     glPushMatrix();
       glTranslatef(-3.1, 4.2, 0.0);
       glRotatef(-2.0 * angle - 25.0, 0.0, 0.0, 1.0);
-      glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, blue);
-      gear(1.3, 2.0, 0.5, 10, 0.7);
+      glCallList(gear3);
     glPopMatrix();
 
   glPopMatrix();
@@ -243,6 +244,9 @@ draw(void)
 static void
 init (int argc, char *argv[])
 {
+  static GLfloat red[4] = {0.8, 0.1, 0.0, 1.0};
+  static GLfloat green[4] = {0.0, 0.8, 0.2, 1.0};
+  static GLfloat blue[4] = {0.2, 0.2, 1.0, 1.0};
   static GLfloat pos[4] = {5.0, 5.0, 10.0, 0.0};
   static GLfloat ambient[4] = {0.2, 0.2, 0.2, 1.0};
   int i;
@@ -253,6 +257,24 @@ init (int argc, char *argv[])
   glEnable(GL_LIGHTING);
   glEnable(GL_LIGHT0);
   glEnable(GL_DEPTH_TEST);
+
+  gear1 = glGenLists(1);
+  glNewList(gear1, GL_COMPILE);
+  glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, red);
+  gear(1.0, 4.0, 1.0, 20, 0.7);
+  glEndList();
+
+  gear2 = glGenLists(1);
+  glNewList(gear2, GL_COMPILE);
+  glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, green);
+  gear(0.5, 2.0, 2.0, 10, 0.7);
+  glEndList();
+
+  gear3 = glGenLists(1);
+  glNewList(gear3, GL_COMPILE);
+  glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, blue);
+  gear(1.3, 2.0, 0.5, 10, 0.7);
+  glEndList();
 
   glEnable(GL_NORMALIZE);
 
@@ -292,6 +314,8 @@ int main(int argc, char *argv[])
 
   init(argc, argv);
 
+  T0 = elapsed_time();
+
 
   double t0 = -1.;
 
@@ -319,6 +343,8 @@ int main(int argc, char *argv[])
         quit = 1;
   }
 
+
+  cleanup();
 
   return 0;
 }

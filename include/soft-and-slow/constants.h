@@ -153,5 +153,8 @@
 #define GL_EXTENSIONS               0x1F03
 #define GL_SHADING_LANGUAGE_VERSION 0x8B8C
 
+#define GL_COMPILE             0x1300
+#define GL_COMPILE_AND_EXECUTE 0x1301
+
 
 #endif

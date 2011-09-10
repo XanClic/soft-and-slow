@@ -129,6 +129,8 @@ struct sas_draw_thread_info
 };
 
 
+#include "command-lists.h"
 #include "light.h"
+
 
 #endif

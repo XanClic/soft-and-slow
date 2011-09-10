@@ -20,4 +20,7 @@
 // Number of lights
 #define SAS_LIGHTS 8
 
+// Maximum number of display lists
+#define SAS_MAX_DISPLAY_LISTS 32
+
 #endif

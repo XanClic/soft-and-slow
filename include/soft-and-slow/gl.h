@@ -59,8 +59,11 @@ void glBegin(GLenum mode);
 void glEnd(void);
 
 void glColor3f(GLfloat r, GLfloat g, GLfloat b);
+void glColor4f(GLfloat r, GLfloat g, GLfloat b, GLfloat a);
 void glTexCoord2f(GLfloat s, GLfloat t);
+void glTexCoord4f(GLfloat s, GLfloat t, GLfloat p, GLfloat q);
 void glVertex3f(GLfloat x, GLfloat y, GLfloat z);
+void glVertex4f(GLfloat x, GLfloat y, GLfloat z, GLfloat w);
 
 void glActiveTexture(GLenum unit);
 void glBindTexture(GLenum target, GLuint id);
@@ -72,6 +75,12 @@ void glLightfv(GLenum light, GLenum pname, const GLfloat *params);
 void glMaterialf(GLenum face, GLenum pname, const GLfloat param);
 void glMaterialfv(GLenum face, GLenum pname, const GLfloat *params);
 void glNormal3f(GLfloat x, GLfloat y, GLfloat z);
+
+GLuint glGenLists(GLsizei range);
+void glDeleteLists(GLuint list, GLsizei range);
+void glNewList(GLuint list, GLenum mode);
+void glEndList(void);
+void glCallList(GLuint list);
 
 
 #ifdef __cplusplus

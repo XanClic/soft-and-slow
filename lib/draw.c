@@ -37,9 +37,26 @@ extern bool sas_smooth_shading;
 
 extern unsigned sas_current_buf_index;
 
+extern sas_command_list_t **sas_current_command_list;
+extern bool sas_execute_ccl;
+
 
 void glBegin(GLenum mode)
 {
+    if (sas_current_command_list != NULL)
+    {
+        struct sas_command_begin *cmd_beg = calloc(1, sizeof(*cmd_beg));
+        cmd_beg->cl.cmd = SAS_COMMAND_BEGIN;
+        cmd_beg->mode = mode;
+
+        // FIXME: Atomically (same for all the following).
+        *sas_current_command_list = &cmd_beg->cl;
+        sas_current_command_list = &cmd_beg->cl.next;
+
+        if (!sas_execute_ccl)
+            return;
+    }
+
     switch (mode)
     {
         case GL_POINTS:
@@ -68,42 +85,104 @@ void glBegin(GLenum mode)
 
 void glEnd(void)
 {
+    if (sas_current_command_list != NULL)
+    {
+        sas_command_list_t *cmd_end = calloc(1, sizeof(*cmd_end));
+        cmd_end->cmd = SAS_COMMAND_END;
+
+        *sas_current_command_list = cmd_end;
+        sas_current_command_list = &cmd_end->next;
+
+        if (!sas_execute_ccl)
+            return;
+    }
+
     sas_current_mode = -1;
 }
 
 
 void glColor3f(GLfloat r, GLfloat g, GLfloat b)
 {
-    sas_current_color.r = r;
-    sas_current_color.g = g;
-    sas_current_color.b = b;
-    sas_current_color.a = 1.f;
+    glColor4f(r, g, b, 1.f);
 }
 
-void glTexCoord2f(GLfloat s, GLfloat v)
+void glColor4f(GLfloat r, GLfloat g, GLfloat b, GLfloat a)
 {
+    if (sas_current_command_list != NULL)
+    {
+        struct sas_command_color *cmd_col = calloc(1, sizeof(*cmd_col));
+        cmd_col->cl.cmd = SAS_COMMAND_COLOR;
+        cmd_col->color = (sas_color_t){ r, g, b, a };
+
+        *sas_current_command_list = &cmd_col->cl;
+        sas_current_command_list = &cmd_col->cl.next;
+
+        if (!sas_execute_ccl)
+            return;
+    }
+
+    sas_current_color = (sas_color_t){ r, g, b, a };
+}
+
+void glTexCoord2f(GLfloat s, GLfloat t)
+{
+    glTexCoord4f(s, t, 0.f, 1.f);
+}
+
+void glTexCoord4f(GLfloat s, GLfloat t, GLfloat p, GLfloat q)
+{
+    if (sas_current_command_list != NULL)
+    {
+        struct sas_command_texcoord *cmd_tex = calloc(1, sizeof(*cmd_tex));
+        cmd_tex->cl.cmd = SAS_COMMAND_TEXCOORD;
+        cmd_tex->coord[0] = s;
+        cmd_tex->coord[1] = t;
+        cmd_tex->coord[2] = p;
+        cmd_tex->coord[3] = q;
+
+        *sas_current_command_list = &cmd_tex->cl;
+        sas_current_command_list = &cmd_tex->cl.next;
+
+        if (!sas_execute_ccl)
+            return;
+    }
+
     sas_multi_texcoord0[0] = s;
-    sas_multi_texcoord0[1] = v;
-    sas_multi_texcoord0[2] = 0.f;
-    sas_multi_texcoord0[3] = 1.f;
+    sas_multi_texcoord0[1] = t;
+    sas_multi_texcoord0[2] = p;
+    sas_multi_texcoord0[3] = q;
 }
 
 void glNormal3f(GLfloat x, GLfloat y, GLfloat z)
 {
-    if (!sas_normalize_normals)
-    {
-        sas_current_normal[0] = x;
-        sas_current_normal[1] = y;
-        sas_current_normal[2] = z;
-    }
-    else
+    if (sas_normalize_normals)
     {
         float fac = 1.f / sqrtf(x * x + y * y + z * z);
 
-        sas_current_normal[0] = x * fac;
-        sas_current_normal[1] = y * fac;
-        sas_current_normal[2] = z * fac;
+        if (fac != 1.f)
+            x *= fac; y *= fac; z *= fac;
     }
+
+
+    if (sas_current_command_list != NULL)
+    {
+        struct sas_command_normal *cmd_nml = calloc(1, sizeof(*cmd_nml));
+        cmd_nml->cl.cmd = SAS_COMMAND_NORMAL;
+        cmd_nml->normal[0] = x;
+        cmd_nml->normal[1] = y;
+        cmd_nml->normal[2] = z;
+
+        *sas_current_command_list = &cmd_nml->cl;
+        sas_current_command_list = &cmd_nml->cl.next;
+
+        if (!sas_execute_ccl)
+            return;
+    }
+
+
+    sas_current_normal[0] = x;
+    sas_current_normal[1] = y;
+    sas_current_normal[2] = z;
 }
 
 
@@ -528,10 +607,32 @@ void sas_do_triangle(sas_color_t c1, float *t1, float *v1, int i1, sas_color_t c
 
 void glVertex3f(GLfloat x, GLfloat y, GLfloat z)
 {
+    glVertex4f(x, y, z, 1.f);
+}
+
+void glVertex4f(GLfloat x, GLfloat y, GLfloat z, GLfloat w)
+{
+    if (sas_current_command_list != NULL)
+    {
+        struct sas_command_vertex *cmd_vtx = calloc(1, sizeof(*cmd_vtx));
+        cmd_vtx->cl.cmd = SAS_COMMAND_VERTEX;
+        cmd_vtx->position[0] = x;
+        cmd_vtx->position[1] = y;
+        cmd_vtx->position[2] = z;
+        cmd_vtx->position[3] = w;
+
+        *sas_current_command_list = &cmd_vtx->cl;
+        sas_current_command_list = &cmd_vtx->cl.next;
+
+        if (!sas_execute_ccl)
+            return;
+    }
+
+
     sas_current_vertex[0] = x;
     sas_current_vertex[1] = y;
     sas_current_vertex[2] = z;
-    sas_current_vertex[3] = 1.f;
+    sas_current_vertex[3] = w;
 
     sas_transform_vertex_to_screen();
 

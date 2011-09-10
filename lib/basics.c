@@ -34,6 +34,9 @@ extern bool sas_normalize_normals;
 
 extern sas_light_t sas_lights[SAS_LIGHTS];
 
+extern sas_command_list_t **sas_current_command_list;
+extern bool sas_execute_ccl;
+
 
 extern void sas_load_fixed_pipeline(bool lighting);
 
@@ -244,6 +247,20 @@ void glFrontFace(GLenum mode)
 
 void glShadeModel(GLenum mode)
 {
+    if (sas_current_command_list != NULL)
+    {
+        struct sas_command_shade_model *cmd_shm = calloc(1, sizeof(*cmd_shm));
+        cmd_shm->cl.cmd = SAS_COMMAND_SHADE_MODEL;
+        cmd_shm->model = mode;
+
+        *sas_current_command_list = &cmd_shm->cl;
+        sas_current_command_list = &cmd_shm->cl.next;
+
+        if (!sas_execute_ccl)
+            return;
+    }
+
+
     if ((mode != GL_FLAT) && (mode != GL_SMOOTH))
     {
         sas_error = GL_INVALID_ENUM;
