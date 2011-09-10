@@ -20,6 +20,7 @@ typedef unsigned      GLuint;
 typedef float         GLfloat;
 typedef double        GLdouble;
 typedef char          GLchar;
+typedef unsigned char GLubyte;
 typedef unsigned char GLboolean;
 typedef int           GLsizei;
 typedef unsigned      GLenum;

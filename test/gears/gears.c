@@ -241,10 +241,11 @@ draw(void)
 
 
 static void
-init (void)
+init (int argc, char *argv[])
 {
   static GLfloat pos[4] = {5.0, 5.0, 10.0, 0.0};
-  static GLfloat ambient[4] = {0.3, 0.3, 0.3, 1.0};
+  static GLfloat ambient[4] = {0.2, 0.2, 0.2, 1.0};
+  int i;
 
   glLightfv(GL_LIGHT0, GL_POSITION, pos);
   glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
@@ -264,10 +265,20 @@ init (void)
   glMatrixMode(GL_MODELVIEW);
 
   glLoadIdentity();
+
+
+  for ( i=1; i<argc; i++ ) {
+    if (strcmp(argv[i], "-info")==0) {
+      printf("GL_RENDERER   = %s\n", (char *) glGetString(GL_RENDERER));
+      printf("GL_VERSION    = %s\n", (char *) glGetString(GL_VERSION));
+      printf("GL_VENDOR     = %s\n", (char *) glGetString(GL_VENDOR));
+      printf("GL_EXTENSIONS = %s\n", (char *) glGetString(GL_EXTENSIONS));
+    }
+  }
 }
 
 
-int main(void)
+int main(int argc, char *argv[])
 {
   sas_context_t ctx = create_sas_context(300, 300);
   set_current_sas_context(ctx);
@@ -279,7 +290,7 @@ int main(void)
 
   ctx->colorbuffer = (SAS_COLOR_TYPE *)sfc->pixels;
 
-  init();
+  init(argc, argv);
 
 
   double t0 = -1.;

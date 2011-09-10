@@ -147,5 +147,11 @@
 #define GL_FLAT   0x1D00
 #define GL_SMOOTH 0x1D01
 
+#define GL_VENDOR                   0x1F00
+#define GL_RENDERER                 0x1F01
+#define GL_VERSION                  0x1F02
+#define GL_EXTENSIONS               0x1F03
+#define GL_SHADING_LANGUAGE_VERSION 0x8B8C
+
 
 #endif

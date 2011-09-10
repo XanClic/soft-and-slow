@@ -253,3 +253,23 @@ void glShadeModel(GLenum mode)
 
     sas_smooth_shading = (mode == GL_SMOOTH);
 }
+
+const GLubyte *glGetString(GLenum name)
+{
+    switch (name)
+    {
+        case GL_VENDOR:
+            return (const GLubyte *)"ASX";
+        case GL_RENDERER:
+            return (const GLubyte *)"Soft And Slow";
+        case GL_VERSION:
+            return (const GLubyte *)"2.1";
+        case GL_SHADING_LANGUAGE_VERSION:
+            return (const GLubyte *)"1.40";
+        case GL_EXTENSIONS:
+            return (const GLubyte *)"GL_ARB_texture_non_power_of_two GL_ARB_texture_rectangle";
+        default:
+            sas_error = GL_INVALID_ENUM;
+            return NULL;
+    }
+}
