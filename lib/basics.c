@@ -23,7 +23,7 @@ extern GLenum sas_error;
 extern SAS_MATRIX_TYPE sas_modelview[16], sas_projection[16];
 
 extern bool sas_do_depth_test, sas_do_alpha_test, sas_2d_textures_enabled;
-extern bool sas_smooth_shading;
+extern bool sas_smooth_shading, sas_lighting_enabled;
 extern bool (*sas_depth_func)(float new, float current);
 extern bool (*sas_alpha_func)(float new, float ref);
 
@@ -136,7 +136,10 @@ void glEnable(GLenum cap)
             sas_2d_textures_enabled = true;
             break;
         case GL_LIGHTING:
+#ifdef USE_SHADERS
             sas_load_fixed_pipeline(true);
+#endif
+            sas_lighting_enabled = true;
             break;
         case GL_LIGHT0:
             sas_lights[0].enabled = true;
@@ -166,7 +169,10 @@ void glDisable(GLenum cap)
             sas_2d_textures_enabled = false;
             break;
         case GL_LIGHTING:
+#ifdef USE_SHADERS
             sas_load_fixed_pipeline(false);
+#endif
+            sas_lighting_enabled = false;
             break;
         case GL_LIGHT0:
             sas_lights[0].enabled = false;
@@ -191,6 +197,8 @@ GLboolean glIsEnabled(GLenum cap)
             return sas_do_depth_test;
         case GL_TEXTURE_2D:
             return sas_2d_textures_enabled;
+        case GL_LIGHTING:
+            return sas_lighting_enabled;
         case GL_LIGHT0:
             return sas_lights[0].enabled;
         case GL_NORMALIZE:

@@ -10,10 +10,10 @@ typedef struct sas_light sas_light_t;
 
 struct sas_light
 {
-    bool enabled;
-
     float position[4];
     sas_color_t ambient, diffuse, specular;
+
+    bool enabled;
 };
 
 

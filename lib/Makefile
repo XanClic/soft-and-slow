@@ -1,7 +1,22 @@
+THREADING = 0
+ASSEMBLY = 1
+SHADERS = 0
+
 AR = ar rcs
 CC = gcc
 OCP = objcopy
-CFLAGS = -O3 -mmmx -msse -msse2 -mssse3 -g2 -std=c1x -Wall -Wextra -pedantic -I../include -D_GNU_SOURCE -masm=intel -DUSE_ASSEMBLY
+
+CFLAGS = -O3 -march=native -g2 -std=c1x -Wall -Wextra -pedantic -I../include -D_GNU_SOURCE
+ifeq ($(THREADING), 1)
+CFLAGS += -DTHREADING -pthread
+endif
+ifeq ($(ASSEMBLY), 1)
+CFLAGS += -DUSE_ASSEMBLY -masm=intel
+endif
+ifeq ($(SHADERS), 1)
+CFLAGS += -DUSE_SHADERS
+endif
+
 OCP_FROM_TEXT = -I binary -O elf64-x86-64 -B i386
 RM = rm -f
 ASM = fasm
@@ -11,7 +26,21 @@ ASM = fasm
 # .hpp: Shader include files
 # .cpp: Common shader "attachments"
 # .asm: Assembly helpers
-OBJECTS = $(patsubst %.c,%.o,$(wildcard *.c)) $(patsubst %.glsl,%.o,$(wildcard *.glsl)) $(patsubst %.hpp,%.o,$(wildcard *.hpp)) $(patsubst %.cpp,%.o,$(wildcard *.cpp)) $(patsubst %.asm,%-asm.o,$(wildcard *.asm))
+OBJECTS = $(patsubst %.c,%.o,$(wildcard *.c))
+
+ifeq ($(THREADING), 0)
+OBJECTS := $(subst threads.o,,$(OBJECTS))
+endif
+
+ifeq ($(ASSEMBLY), 1)
+OBJECTS += $(patsubst %.asm,%-asm.o,$(wildcard *.asm))
+endif
+
+ifeq ($(SHADERS), 1)
+OBJECTS += $(patsubst %.glsl,%.o,$(wildcard *.glsl)) $(patsubst %.hpp,%.o,$(wildcard *.hpp)) $(patsubst %.cpp,%.o,$(wildcard *.cpp))
+else
+OBJECTS := $(subst shader.o,,$(OBJECTS))
+endif
 
 .PHONY: all clean
 
@@ -36,4 +65,4 @@ libSASGL.a: $(OBJECTS)
 	$(ASM) $< $@
 
 clean:
-	$(RM) $(OBJECTS) libSASGL.a
+	$(RM) *.o libSASGL.a
