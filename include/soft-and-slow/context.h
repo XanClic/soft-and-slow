@@ -28,11 +28,17 @@ struct sas_context
     SAS_DEPTH_TYPE *depthbuffer;
     // Stencil data
     SAS_STENCIL_TYPE *stencilbuffer;
+
+    // True, if the color buffer has been allocated by create_sas_context
+    bool allocated_colorbuffer;
 };
 
 
 // Creates a new S&S context with the given width and heigth
 sas_context_t create_sas_context(unsigned width, unsigned height);
+// Also creates a new S&S context, but uses the given memory area as the color
+// buffer.
+sas_context_t create_bound_sas_context(unsigned width, unsigned height, void *colorbuffer);
 
 // Destroys the given S&S context
 void destroy_sas_context(sas_context_t context);

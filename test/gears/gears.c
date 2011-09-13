@@ -302,15 +302,13 @@ init (int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-  sas_context_t ctx = create_sas_context(300, 300);
-  set_current_sas_context(ctx);
-
   SDL_Init(SDL_INIT_VIDEO);
 
   SDL_Surface *sfc = SDL_SetVideoMode(300, 300, 32, SDL_SWSURFACE);
   SDL_WM_SetCaption("Gears", "Gears");
 
-  ctx->colorbuffer = (SAS_COLOR_TYPE *)sfc->pixels;
+  sas_context_t ctx = create_bound_sas_context(300, 300, sfc->pixels);
+  set_current_sas_context(ctx);
 
   init(argc, argv);
 
@@ -345,6 +343,8 @@ int main(int argc, char *argv[])
 
 
   cleanup();
+
+  destroy_sas_context(ctx);
 
   return 0;
 }
