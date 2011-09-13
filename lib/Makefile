@@ -1,6 +1,6 @@
 THREADING = 0
 ASSEMBLY = 1
-SHADERS = 0
+SHADERS = 1
 
 AR = ar rcs
 CC = gcc
