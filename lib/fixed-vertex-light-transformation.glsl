@@ -5,9 +5,9 @@ typedef struct sas_light sas_light_t;
 
 struct sas_light
 {
-    bool enabled;
-
     vec4 position, ambient, diffuse, specular;
+
+    bool enabled;
 };
 
 typedef struct sas_material sas_material_t;
@@ -22,6 +22,7 @@ struct sas_material
 extern "C" sas_light_t sas_lights[8];
 extern "C" sas_material_t sas_current_material;
 
+extern "C" int printf(const char *s, ...);
 
 void main()
 {
@@ -37,7 +38,7 @@ void main()
         if (!sas_lights[i].enabled)
             continue;
 
-        vec3 pos = normalize(sas_lights[i].position);
+        vec3 pos = normalize(vec3(sas_lights[i].position));
 
         col += sas_lights[i].ambient * sas_current_material.ambient;
         // TODO: Point lights

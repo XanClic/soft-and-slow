@@ -61,22 +61,30 @@ void glBegin(GLenum mode)
     {
         case GL_POINTS:
             sas_current_mode = GL_POINTS;
+#ifdef USE_SHADERS
             sas_varyings_alloc(1);
+#endif
             break;
         case GL_TRIANGLES:
             sas_triangle_index = 0;
             sas_current_mode = GL_TRIANGLES;
+#ifdef USE_SHADERS
             sas_varyings_alloc(3);
+#endif
             break;
         case GL_QUADS:
             sas_quad_index = 0;
             sas_current_mode = GL_QUADS;
+#ifdef USE_SHADERS
             sas_varyings_alloc(4);
+#endif
             break;
         case GL_QUAD_STRIP:
             sas_quad_index = 0;
             sas_current_mode = GL_QUAD_STRIP;
+#ifdef USE_SHADERS
             sas_varyings_alloc(4);
+#endif
             break;
         default:
             sas_error = GL_INVALID_ENUM;
@@ -186,7 +194,9 @@ void glNormal3f(GLfloat x, GLfloat y, GLfloat z)
 }
 
 
+#ifdef USE_ASSEMBLY
 static float xmm_one[4]        = { 1.f, 1.f, 1.f, 1.f };
+#endif
 
 
 #ifdef THREADING
@@ -390,7 +400,9 @@ void sas_do_triangle(void *dti_voidptr)
             dti->current_texcoord[0][3] = (dti->vertex_texcoords[0][3] * w1 + dti->vertex_texcoords[1][3] * w2 + dti->vertex_texcoords[2][3] * w3) * dd;
 #endif
 
+#ifdef USE_SHADERS
 //          sas_calc_varyings(i1, i2, i3, w1, w2, w3, dd);
+#endif
 
             sas_transform_fragment(dti);
         }
@@ -400,6 +412,13 @@ void sas_do_triangle(void *dti_voidptr)
 // Fills a triangle.
 void sas_do_triangle(sas_color_t c1, float *t1, float *v1, int i1, sas_color_t c2, float *t2, float *v2, int i2, sas_color_t c3, float *t3, float *v3, int i3)
 {
+#ifndef USE_SHADERS
+    (void)i1;
+    (void)i2;
+    (void)i3;
+#endif
+
+
     float vec1[4] = {
         (v2[0] - v1[0]) * .5f,
         (v2[1] - v1[1]) * .5f,
@@ -597,7 +616,9 @@ void sas_do_triangle(sas_color_t c1, float *t1, float *v1, int i1, sas_color_t c
             sas_current_texcoord[0][3] = (t1[3] * w1 + t2[3] * w2 + t3[3] * w3) * dd;
 #endif
 
+#ifdef USE_SHADERS
             sas_calc_varyings(i1, i2, i3, w1, w2, w3, dd);
+#endif
 
             sas_transform_fragment();
         }
@@ -636,7 +657,9 @@ void glVertex4f(GLfloat x, GLfloat y, GLfloat z, GLfloat w)
 
     sas_transform_vertex_to_screen();
 
+#ifdef USE_SHADERS
     sas_push_varyings();
+#endif
 
     if (sas_current_mode == GL_POINTS)
     {
@@ -644,7 +667,9 @@ void glVertex4f(GLfloat x, GLfloat y, GLfloat z, GLfloat w)
         sas_transform_fragment();
 #endif
 
+#ifdef USE_SHADERS
         sas_flush_varyings();
+#endif
     }
     else if (sas_current_mode == GL_TRIANGLES)
     {
@@ -692,7 +717,9 @@ void glVertex4f(GLfloat x, GLfloat y, GLfloat z, GLfloat w)
 #endif
 
 
+#ifdef USE_SHADERS
             sas_flush_varyings();
+#endif
         }
     }
     else if (sas_current_mode == GL_QUADS)
@@ -765,7 +792,9 @@ void glVertex4f(GLfloat x, GLfloat y, GLfloat z, GLfloat w)
 #endif
 
 
+#ifdef USE_SHADERS
             sas_flush_varyings();
+#endif
         }
     }
     else if (sas_current_mode == GL_QUAD_STRIP)
@@ -837,7 +866,9 @@ void glVertex4f(GLfloat x, GLfloat y, GLfloat z, GLfloat w)
             sas_current_color = curcol;
 #endif
 
+#ifdef USE_SHADERS
             sas_flush_varyings_partially(2);
+#endif
 
             memcpy(&sas_quad_colors[0], &sas_quad_colors[2], sizeof(sas_quad_colors[0]) * 2);
             memcpy(&sas_quad_texcoords[0], &sas_quad_texcoords[2], sizeof(sas_quad_texcoords[0]) * 2);

@@ -11,6 +11,7 @@
 #include <soft-and-slow/threads.h>
 
 
+#ifdef USE_SHADERS
 extern char _binary_fixed_vertex_transformation_glsl_start[];
 extern const void _binary_fixed_vertex_transformation_glsl_size;
 
@@ -122,6 +123,7 @@ void sas_load_fixed_pipeline(bool lighting)
 
     glUseProgram(0);
 }
+#endif
 
 
 void sas_init(void)
@@ -131,7 +133,9 @@ void sas_init(void)
     glDepthFunc(GL_LESS);
 
 
+#ifdef USE_SHADERS
     sas_load_fixed_pipeline(false);
+#endif
 
 
     glActiveTexture(GL_TEXTURE0);

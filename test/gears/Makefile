@@ -2,7 +2,7 @@ CC = gcc
 LINK = gcc
 RM = rm -f
 CFLAGS = -rdynamic -O3 -Wall -Wextra -std=c1x -I../../include
-LDFLAGS = -rdynamic -L../../lib -lSDL -lSASGL
+LDFLAGS = -rdynamic -L../../lib -lSDL -lSASGL -lm -lrt
 
 .PHONY: all clean
 

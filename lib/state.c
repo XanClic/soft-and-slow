@@ -92,6 +92,8 @@ GLuint sas_texture_units_2d[SAS_TEX_UNITS];
 
 
 
+bool sas_lighting_enabled = false;
+
 // All are disabled per default, which is how "enabled" is statically
 // initialized (to false).
 sas_light_t sas_lights[SAS_LIGHTS] = {
