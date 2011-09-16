@@ -83,8 +83,7 @@ mulps   xmm2,[rax + 32]
 
 addps   xmm0,xmm1
 addps   xmm0,xmm2
-movaps  xmm1,[rax + 48]
-addps   xmm0,xmm1
+addps   xmm0,[rax + 48]
 movaps  [rax + 48],xmm0
 
 jmp     sas_update_mvp
