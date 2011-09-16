@@ -33,7 +33,7 @@ extern int sas_triangle_index, sas_quad_index;
 
 extern bool sas_do_cw_culling, sas_do_ccw_culling;
 extern bool sas_normalize_normals;
-extern bool sas_smooth_shading;
+extern bool sas_smooth_shading, sas_2d_textures_enabled;
 
 extern unsigned sas_current_buf_index;
 
@@ -514,64 +514,100 @@ void sas_do_triangle(sas_color_t c1, float *t1, float *v1, int i1, sas_color_t c
 
             if (sas_smooth_shading)
             {
-                __asm__ __volatile__ ("pshufd   xmm13,%6,0x00;" // w2 = s
-                                      "pshufd   xmm14,%7,0x00;" // w3 = t
-                                      "movaps   xmm12,[%8];"
-                                      "subps    xmm12,xmm13;"
-                                      "subps    xmm12,xmm14;"   // w1 = 1 - s - t
-                                      "pshufd   xmm0,%9,0x00;"
-                                      "mulps    xmm12,xmm0;"    // w1 *= d1
-                                      "pshufd   xmm0,%10,0x00;"
-                                      "mulps    xmm13,xmm0;"    // w2 *= d2
-                                      "pshufd   xmm0,%11,0x00;"
-                                      "mulps    xmm14,xmm0;"    // w3 *= d3
-                                      "movaps   xmm15,xmm12;"
-                                      "addps    xmm15,xmm13;"
-                                      "addps    xmm15,xmm14;"
-                                      "rcpps    xmm15,xmm15;"   // dd = 1 / (w1 + w2 + w3)
-                                      "movss    %0,xmm12;"
-                                      "movss    %1,xmm13;"
-                                      "movss    %2,xmm14;"
-                                      "movss    %3,xmm15;"
+                if (sas_2d_textures_enabled)
+                {
+                    __asm__ __volatile__ ("pshufd   xmm13,%6,0x00;" // w2 = s
+                                          "pshufd   xmm14,%7,0x00;" // w3 = t
+                                          "movaps   xmm12,[%8];"
+                                          "subps    xmm12,xmm13;"
+                                          "subps    xmm12,xmm14;"   // w1 = 1 - s - t
+                                          "pshufd   xmm15,%9,0x00;"
+                                          "mulps    xmm12,xmm15;"    // w1 *= d1
+                                          "pshufd   xmm15,%10,0x00;"
+                                          "mulps    xmm13,xmm15;"    // w2 *= d2
+                                          "pshufd   xmm15,%11,0x00;"
+                                          "mulps    xmm14,xmm15;"    // w3 *= d3
+                                          "movaps   xmm15,xmm12;"
+                                          "addps    xmm15,xmm13;"
+                                          "addps    xmm15,xmm14;"
+                                          "rcpps    xmm15,xmm15;"   // dd = 1 / (w1 + w2 + w3)
+                                          "movss    %0,xmm12;"
+                                          "movss    %1,xmm13;"
+                                          "movss    %2,xmm14;"
+                                          "movss    %3,xmm15;"
 
-                                      "movaps   xmm0,%12;"
-                                      "mulps    xmm0,xmm12;"
-                                      "movaps   xmm1,%13;"
-                                      "mulps    xmm1,xmm13;"
-                                      "addps    xmm0,xmm1;"
-                                      "movaps   xmm1,%14;"
-                                      "mulps    xmm1,xmm14;"
-                                      "addps    xmm0,xmm1;"
-                                      "mulps    xmm0,xmm15;"
-                                      "movaps   %4,xmm0;"
+                                          "movaps   xmm0,%12;"
+                                          "mulps    xmm0,xmm12;"
+                                          "movaps   xmm1,%13;"
+                                          "mulps    xmm1,xmm13;"
+                                          "addps    xmm0,xmm1;"
+                                          "movaps   xmm1,%14;"
+                                          "mulps    xmm1,xmm14;"
+                                          "addps    xmm0,xmm1;"
+                                          "mulps    xmm0,xmm15;"
+                                          "movaps   %4,xmm0;"
 
-                                      "mulps    xmm12,%15;"
-                                      "mulps    xmm13,%16;"
-                                      "mulps    xmm14,%17;"
-                                      "addps    xmm12,xmm13;"
-                                      "addps    xmm12,xmm14;"
-                                      "mulps    xmm12,xmm15;"
-                                      "movaps   %5,xmm12"
-                                      : "=x"(w1), "=x"(w2), "=x"(w3), "=x"(dd), "=m"(sas_current_color), "=m"(sas_current_texcoord[0])
-                                      : "x"(s), "x"(t), "r"(xmm_one), "x"(d1), "x"(d2), "x"(d3), "m"(c1), "m"(c2), "m"(c3), "m"(*(sas_xmm_t *)t1), "m"(*(sas_xmm_t *)t2), "m"(*(sas_xmm_t *)t3)
-                                      : "xmm0", "xmm1", "xmm12", "xmm13", "xmm14", "xmm15");
+                                          "mulps    xmm12,%15;"
+                                          "mulps    xmm13,%16;"
+                                          "mulps    xmm14,%17;"
+                                          "addps    xmm12,xmm13;"
+                                          "addps    xmm12,xmm14;"
+                                          "mulps    xmm12,xmm15;"
+                                          "movaps   %5,xmm12"
+                                          : "=x"(w1), "=x"(w2), "=x"(w3), "=x"(dd), "=m"(sas_current_color), "=m"(sas_current_texcoord[0])
+                                          : "x"(s), "x"(t), "r"(xmm_one), "x"(d1), "x"(d2), "x"(d3), "m"(c1), "m"(c2), "m"(c3), "m"(*(sas_xmm_t *)t1), "m"(*(sas_xmm_t *)t2), "m"(*(sas_xmm_t *)t3)
+                                          : "xmm0", "xmm1", "xmm12", "xmm13", "xmm14", "xmm15");
+                }
+                else
+                {
+                    __asm__ __volatile__ ("pshufd   xmm13,%5,0x00;" // w2 = s
+                                          "pshufd   xmm14,%6,0x00;" // w3 = t
+                                          "movaps   xmm12,[%7];"
+                                          "subps    xmm12,xmm13;"
+                                          "subps    xmm12,xmm14;"   // w1 = 1 - s - t
+                                          "pshufd   xmm15,%8,0x00;"
+                                          "mulps    xmm12,xmm15;"    // w1 *= d1
+                                          "pshufd   xmm15,%9,0x00;"
+                                          "mulps    xmm13,xmm15;"    // w2 *= d2
+                                          "pshufd   xmm15,%10,0x00;"
+                                          "mulps    xmm14,xmm15;"    // w3 *= d3
+                                          "movaps   xmm15,xmm14;"
+                                          "addps    xmm15,xmm12;"
+                                          "addps    xmm15,xmm13;"
+                                          "rcpps    xmm15,xmm15;"   // dd = 1 / (w1 + w2 + w3)
+                                          "movss    %0,xmm12;"
+                                          "movss    %1,xmm13;"
+                                          "movss    %2,xmm14;"
+                                          "movss    %3,xmm15;"
+
+                                          "mulps    xmm12,%11;"
+                                          "mulps    xmm13,%12;"
+                                          "mulps    xmm14,%13;"
+                                          "addps    xmm12,xmm13;"
+                                          "addps    xmm12,xmm14;"
+                                          "mulps    xmm12,xmm15;"
+                                          "movaps   %4,xmm12"
+                                          : "=x"(w1), "=x"(w2), "=x"(w3), "=x"(dd), "=m"(sas_current_color)
+                                          : "x"(s), "x"(t), "r"(xmm_one), "x"(d1), "x"(d2), "x"(d3), "m"(c1), "m"(c2), "m"(c3)
+                                          : "xmm12", "xmm13", "xmm14", "xmm15");
+                }
             }
-            else
+            else if (sas_2d_textures_enabled)
             {
                 __asm__ __volatile__ ("pshufd   xmm13,%5,0x00;" // w2 = s
                                       "pshufd   xmm14,%6,0x00;" // w3 = t
                                       "movaps   xmm12,[%7];"
                                       "subps    xmm12,xmm13;"
                                       "subps    xmm12,xmm14;"   // w1 = 1 - s - t
-                                      "pshufd   xmm0,%8,0x00;"
-                                      "mulps    xmm12,xmm0;"    // w1 *= d1
-                                      "pshufd   xmm0,%9,0x00;"
-                                      "mulps    xmm13,xmm0;"    // w2 *= d2
-                                      "pshufd   xmm0,%10,0x00;"
-                                      "mulps    xmm14,xmm0;"    // w3 *= d3
-                                      "movaps   xmm15,xmm12;"
+                                      "pshufd   xmm15,%8,0x00;"
+                                      "mulps    xmm12,xmm15;"    // w1 *= d1
+                                      "pshufd   xmm15,%9,0x00;"
+                                      "mulps    xmm13,xmm15;"    // w2 *= d2
+                                      "pshufd   xmm15,%10,0x00;"
+                                      "mulps    xmm14,xmm15;"    // w3 *= d3
+                                      "movaps   xmm15,xmm14;"
+                                      "addps    xmm15,xmm12;"
                                       "addps    xmm15,xmm13;"
-                                      "addps    xmm15,xmm14;"
                                       "rcpps    xmm15,xmm15;"   // dd = 1 / (w1 + w2 + w3)
                                       "movss    %0,xmm12;"
                                       "movss    %1,xmm13;"
@@ -587,9 +623,40 @@ void sas_do_triangle(sas_color_t c1, float *t1, float *v1, int i1, sas_color_t c
                                       "movaps   %4,xmm12"
                                       : "=x"(w1), "=x"(w2), "=x"(w3), "=x"(dd), "=m"(sas_current_texcoord[0])
                                       : "x"(s), "x"(t), "r"(xmm_one), "x"(d1), "x"(d2), "x"(d3), "m"(*(sas_xmm_t *)t1), "m"(*(sas_xmm_t *)t2), "m"(*(sas_xmm_t *)t3)
-                                      : "xmm0", "xmm12", "xmm13", "xmm14", "xmm15");
+                                      : "xmm12", "xmm13", "xmm14", "xmm15");
             }
+#ifdef USE_SHADERS
+            else
+            {
+                __asm__ __volatile__ ("pshufd   xmm13,%4,0x00;" // w2 = s
+                                      "pshufd   xmm14,%5,0x00;" // w3 = t
+                                      "movaps   xmm12,[%6];"
+                                      "subps    xmm12,xmm13;"
+                                      "subps    xmm12,xmm14;"   // w1 = 1 - s - t
+                                      "pshufd   xmm15,%7,0x00;"
+                                      "mulps    xmm12,xmm15;"    // w1 *= d1
+                                      "pshufd   xmm15,%8,0x00;"
+                                      "mulps    xmm13,xmm15;"    // w2 *= d2
+                                      "pshufd   xmm15,%9,0x00;"
+                                      "mulps    xmm14,xmm15;"    // w3 *= d3
+                                      "movaps   xmm15,xmm14;"
+                                      "addps    xmm15,xmm12;"
+                                      "addps    xmm15,xmm13;"
+                                      "rcpps    xmm15,xmm15;"   // dd = 1 / (w1 + w2 + w3)
+                                      "movss    %0,xmm12;"
+                                      "movss    %1,xmm13;"
+                                      "movss    %2,xmm14;"
+                                      "movss    %3,xmm15;"
+                                      : "=x"(w1), "=x"(w2), "=x"(w3), "=x"(dd)
+                                      : "x"(s), "x"(t), "r"(xmm_one), "x"(d1), "x"(d2), "x"(d3)
+                                      : "xmm12", "xmm13", "xmm14", "xmm15");
+            }
+#endif
 #else
+#ifndef USE_SHADERS
+            if (sas_smooth_shading || sas_2d_textures_enabled)
+            {
+#endif
             // Get weighting
             float w1 = 1.f - s - t, w2 = s, w3 = t;
 
@@ -609,11 +676,17 @@ void sas_do_triangle(sas_color_t c1, float *t1, float *v1, int i1, sas_color_t c
                 sas_current_color.a = (c1.a * w1 + c2.a * w2 + c3.a * w3) * dd;
             }
 
-            // TODO: Which texture unit to use
-            sas_current_texcoord[0][0] = (t1[0] * w1 + t2[0] * w2 + t3[0] * w3) * dd;
-            sas_current_texcoord[0][1] = (t1[1] * w1 + t2[1] * w2 + t3[1] * w3) * dd;
-            sas_current_texcoord[0][2] = (t1[2] * w1 + t2[2] * w2 + t3[2] * w3) * dd;
-            sas_current_texcoord[0][3] = (t1[3] * w1 + t2[3] * w2 + t3[3] * w3) * dd;
+            if (sas_2d_textures_enabled)
+            {
+                // TODO: Which texture unit to use
+                sas_current_texcoord[0][0] = (t1[0] * w1 + t2[0] * w2 + t3[0] * w3) * dd;
+                sas_current_texcoord[0][1] = (t1[1] * w1 + t2[1] * w2 + t3[1] * w3) * dd;
+                sas_current_texcoord[0][2] = (t1[2] * w1 + t2[2] * w2 + t3[2] * w3) * dd;
+                sas_current_texcoord[0][3] = (t1[3] * w1 + t2[3] * w2 + t3[3] * w3) * dd;
+            }
+#ifndef USE_SHADERS
+            }
+#endif
 #endif
 
 #ifdef USE_SHADERS
